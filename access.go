@@ -185,7 +185,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	}
 
 	// must have a valid client
-	clientData, err := getClientData(ctx, auth, s.Storage)
+	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	// must have a valid client
-	clientData, err := getClientData(ctx, auth, s.Storage)
+	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 	}
 
 	// must have a valid client
-	clientData, err := getClientData(ctx, auth, s.Storage)
+	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +381,7 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 		HttpRequest:     r,
 	}
 
-	clientData, err := getClientData(ctx, auth, s.Storage)
+	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +421,7 @@ func (s *Server) handleAssertionRequest(ctx context.Context, r *http.Request) (*
 	}
 
 	// must have a valid client
-	clientData, err := getClientData(ctx, auth, s.Storage)
+	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -513,27 +513,4 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	}
 
 	return resp, nil
-}
-
-// getClientData looks up and authenticates the basic auth using the given storage.
-// Sets an error on the response if auth fails or a server error occurs.
-func getClientData(ctx context.Context, auth *BasicAuth, storage Storage) (*ClientData, error) {
-	clientData, err := storage.GetClientData(ctx, auth.Username)
-	if err != nil {
-		if _, ok := err.(*NotFoundError); ok {
-			return nil, NewNisoError(E_UNAUTHORIZED_CLIENT, errors.Wrap(err, "could not find client"))
-		}
-
-		return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to get client data from storage"))
-	}
-
-	if !clientData.ValidSecret(auth.Password) {
-		return nil, NewNisoError(E_UNAUTHORIZED_CLIENT, errors.New("invalid secret for client"))
-	}
-
-	if clientData.RedirectUri == "" {
-		return nil, NewNisoError(E_SERVER_ERROR, errors.New("client does not have a valid redirect uri set"))
-	}
-
-	return clientData, err
 }

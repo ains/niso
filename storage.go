@@ -7,6 +7,7 @@ type Storage interface {
 	Close() error
 
 	// GetClientData fetches the data for a ClientData by id
+	// Should return NotFoundError, so an E_INVALID_CLIENT error will be returned instead of E_SERVER_ERROR
 	GetClientData(ctx context.Context, id string) (*ClientData, error)
 
 	// SaveAuthorize saves authorize data.
@@ -19,20 +20,10 @@ type Storage interface {
 
 	// RemoveAuthorize revokes or deletes the authorization code.
 	DeleteAuthorizeData(ctx context.Context, code string) error
-	//
+
 	// SaveAccess writes AccessData.
 	// If RefreshToken is not blank, it must save in a way that can be loaded using LoadRefresh.
 	SaveAccessData(ctx context.Context, data *AccessData) error
-
-	//
-	//// LoadAccess retrieves access data by token. ClientData information MUST be loaded together.
-	//// AuthorizeData and AccessData DON'T NEED to be loaded if not easily available.
-	//// Optionally can return error if expired.
-	//LoadAccess(token string) (*AccessData, error)
-	//
-	//// RemoveAccess revokes or deletes an AccessData.
-	//RemoveAccess(token string) error
-	//
 
 	// GetRefreshTokenData retrieves refresh token data from the token string.
 	GetRefreshTokenData(ctx context.Context, token string) (*RefreshTokenData, error)

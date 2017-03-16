@@ -120,13 +120,9 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	}
 
 	// must have a valid client
-	clientData, err := s.Storage.GetClientData(ctx, r.Form.Get("client_id"))
+	clientData, err := getClientData(ctx, r.Form.Get("client_id"), s.Storage)
 	if err != nil {
-		return nil, NewNisoError(E_INVALID_CLIENT, errors.Wrap(err, "Failed to get client data from storage"))
-	}
-
-	if clientData.RedirectUri == "" {
-		return nil, NewNisoError(E_INVALID_CLIENT, errors.New("ClientData does not have a valid redirect_uri set"))
+		return nil, err
 	}
 	ret.ClientData = clientData
 
@@ -206,10 +202,11 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizeReques
 			}
 			resp.SetRedirect(ar.RedirectUri)
 			resp.SetRedirectFragment(true)
+			if ar.State != "" {
+				resp.Data["state"] = ar.State
+			}
 			return resp, err
-			//if ar.State != "" && w.InternalError == nil {
-			//	resp.Data["state"] = ar.State
-			//}
+
 		} else {
 			resp := NewResponse()
 			resp.SetRedirect(ar.RedirectUri)

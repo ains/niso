@@ -171,7 +171,6 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 		Type:            AUTHORIZATION_CODE,
 		Code:            r.Form.Get("code"),
 		CodeVerifier:    r.Form.Get("code_verifier"),
-		RedirectUri:     r.Form.Get("redirect_uri"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
 		HttpRequest:     r,
@@ -200,20 +199,9 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 		return nil, NewNisoError(E_INVALID_GRANT, errors.New("invalid client id for authorization code"))
 	}
 
+	// authorization code must not be expired
 	if ret.AuthorizeData.IsExpiredAt(s.Now()) {
 		return nil, NewNisoError(E_INVALID_GRANT, errors.New("authorization code expired"))
-	}
-
-	// TODO(ains) extract this out
-	// check redirect uri
-	if ret.RedirectUri == "" {
-		ret.RedirectUri = FirstUri(ret.ClientData.RedirectUri, s.Config.RedirectUriSeparator)
-	}
-	if err = ValidateUriList(ret.ClientData.RedirectUri, ret.RedirectUri, s.Config.RedirectUriSeparator); err != nil {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.New("specified redirect_uri not valid for the given client id"))
-	}
-	if ret.AuthorizeData.RedirectUri != ret.RedirectUri {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.New("redirect uri does not match that of the authorization code"))
 	}
 
 	// Verify PKCE, if present in the authorization data

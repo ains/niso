@@ -132,11 +132,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	}
 
 	if err = ValidateUriList(clientRedirectUri, ret.RedirectUri, s.Config.RedirectUriSeparator); err != nil {
-		if _, ok := err.(UriValidationError); !ok {
-			return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "Specified redirect_uri not valid for the given client_id"))
-		}
-
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "Unknown error validating allowed redirect uris"))
+		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "specified redirect_uri not valid for the given client_id"))
 	}
 
 	ret.Type = AuthorizeRequestType(r.Form.Get("response_type"))

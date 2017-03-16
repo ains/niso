@@ -128,11 +128,9 @@ type AccessTokenGenerator interface {
 
 // GenerateAccessRequest handles access token requests. Generates an AccessRequest from a HTTP request.
 func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
-	// Only allow GET or POST
-	if r.Method == "GET" {
-		if !s.Config.AllowGetAccessRequest {
-			return nil, NewNisoError(E_INVALID_REQUEST, errors.New("GET method not allowed for access requests"))
-		}
+	// Only allow GET (when AllowGetAccessRequest set) or POST
+	if r.Method == "GET" && !s.Config.AllowGetAccessRequest {
+		return nil, NewNisoError(E_INVALID_REQUEST, errors.New("GET method not allowed for access requests"))
 	} else if r.Method != "POST" {
 		return nil, NewNisoError(E_INVALID_REQUEST, errors.New("access requests must POST verb"))
 	}

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,7 +80,6 @@ func TestAccessPassword(t *testing.T) {
 	req.Form.Set("password", "testing")
 	req.Form.Set("state", "a")
 	req.PostForm = make(url.Values)
-
 
 	ctx := context.TODO()
 	ar, err := server.HandleAccessRequest(ctx, req)

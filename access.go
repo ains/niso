@@ -83,18 +83,22 @@ type AccessData struct {
 }
 
 type RefreshTokenData struct {
-	// ClientData information
-	ClientData *ClientData
+	// ID of the client used to issue this refresh token
+	ClientId string
 
+	// Refresh token string
 	RefreshToken string
 
-	ExpiresAt time.Time
+	// Token expiration in seconds
+	ExpiresIn int32
 
+	// Time at which refresh token was created
 	CreatedAt time.Time
 
 	// Redirect Uri from request
 	RedirectUri string
 
+	// Scope requested for this refresh token
 	Scope string
 
 	// Data to be passed to storage. Not used by the library.
@@ -304,7 +308,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	// client must be the same as the previous token
-	if req.PreviousRefreshToken.ClientData.ClientId != req.ClientData.ClientId {
+	if req.PreviousRefreshToken.ClientId != req.ClientData.ClientId {
 		return nil, NewNisoError(E_INVALID_CLIENT, errors.New("request client id must be the same from previous token"))
 	}
 
@@ -461,11 +465,11 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		if ar.GenerateRefresh {
 			// Generate Refresh Token
 			rt := &RefreshTokenData{
-				ClientData: ar.ClientData,
-				CreatedAt:  s.Now(),
-				ExpiresAt:  s.Now().Add(time.Duration(ar.Expiration) * time.Second),
-				UserData:   ar.UserData,
-				Scope:      ar.Scope,
+				ClientId:  ar.ClientData.ClientId,
+				CreatedAt: s.Now(),
+				ExpiresIn: ar.Expiration,
+				UserData:  ar.UserData,
+				Scope:     ar.Scope,
 			}
 			rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
 			if err != nil {

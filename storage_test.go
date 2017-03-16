@@ -56,7 +56,7 @@ func NewTestingStorage() *TestingStorage {
 	}
 
 	r.refresh["r9999"] = &RefreshTokenData{
-		ClientData:   r.clients["1234"],
+		ClientId:     "1234",
 		RefreshToken: "9999",
 	}
 

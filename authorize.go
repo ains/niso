@@ -2,11 +2,12 @@ package niso
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"net/http"
 	"net/url"
 	"regexp"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // AuthorizeRequestType is the type for OAuth param `response_type`

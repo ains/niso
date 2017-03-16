@@ -126,8 +126,8 @@ type AccessTokenGenerator interface {
 	GenerateRefreshToken(ar *AccessRequest) (refreshToken string, err error)
 }
 
-// HandleAccessRequest is the http.HandlerFunc for handling access token requests
-func (s *Server) HandleAccessRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
+// GenerateAccessRequest handles access token requests. Generates an AccessRequest from a HTTP request.
+func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
 	// Only allow GET or POST
 	if r.Method == "GET" {
 		if !s.Config.AllowGetAccessRequest {

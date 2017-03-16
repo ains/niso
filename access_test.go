@@ -27,7 +27,7 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
-	ar, err := server.HandleAccessRequest(ctx, req)
+	ar, err := server.GenerateAccessRequest(ctx, req)
 	require.NoError(t, err)
 	ar.Authorized = true
 	resp, err := server.FinishAccessRequest(ctx, ar)
@@ -54,7 +54,7 @@ func TestAccessRefreshToken(t *testing.T) {
 	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
-	ar, err := server.HandleAccessRequest(ctx, req)
+	ar, err := server.GenerateAccessRequest(ctx, req)
 	require.NoError(t, err)
 	ar.Authorized = true
 	resp, err := server.FinishAccessRequest(ctx, ar)
@@ -82,7 +82,7 @@ func TestAccessPassword(t *testing.T) {
 	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
-	ar, err := server.HandleAccessRequest(ctx, req)
+	ar, err := server.GenerateAccessRequest(ctx, req)
 	require.NoError(t, err)
 	ar.Authorized = ar.Username == "testing" && ar.Password == "testing"
 	resp, err := server.FinishAccessRequest(ctx, ar)
@@ -109,7 +109,7 @@ func TestAccessClientCredentials(t *testing.T) {
 	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
-	ar, err := server.HandleAccessRequest(ctx, req)
+	ar, err := server.GenerateAccessRequest(ctx, req)
 	require.NoError(t, err)
 	ar.Authorized = true
 	resp, err := server.FinishAccessRequest(ctx, ar)
@@ -191,7 +191,7 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		req.Form.Set("code_verifier", test.Verifier)
 		req.PostForm = make(url.Values)
 
-		ar, err := server.HandleAccessRequest(ctx, req)
+		ar, err := server.GenerateAccessRequest(ctx, req)
 		if test.ExpectedError != "" {
 			require.Error(t, err)
 			require.IsType(t, &NisoError{}, err, "error should be of type NisoError")

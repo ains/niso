@@ -99,8 +99,7 @@ type AuthorizeTokenGenerator interface {
 	GenerateAuthorizeToken(data *AuthorizeData) (string, error)
 }
 
-// HandleAuthorizeRequest is the main http.HandlerFunc for handling
-// authorization requests
+// GenerateAuthorizeRequest handles authorization requests. Generates an AuthorizeRequest from a HTTP request.
 func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) (*AuthorizeRequest, error) {
 	r.ParseForm()
 

@@ -32,16 +32,14 @@ type AccessRequest struct {
 
 	PreviousRefreshToken *RefreshTokenData
 
-	// Force finish to use this access data, to allow access data reuse
-	ForceAccessData *AccessData
-	RedirectUri     string
-	Scope           string
-	Username        string
-	Password        string
-	AssertionType   string
-	Assertion       string
+	RedirectUri   string
+	Scope         string
+	Username      string
+	Password      string
+	AssertionType string
+	Assertion     string
 
-	// Set if request is authorized
+	// Set if request is Authorized
 	Authorized bool
 
 	// Token expiration in seconds. Change if different from default
@@ -203,20 +201,6 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	if ret.AuthorizeData.IsExpiredAt(s.Now()) {
 		return nil, NewNisoError(E_INVALID_GRANT, errors.New("authorization code expired"))
 	}
-
-	//
-	//if ret.AuthorizeData.Client == nil {
-	//	w.SetError(E_UNAUTHORIZED_CLIENT, "")
-	//	return nil
-	//}
-	//if ret.AuthorizeData.Client.GetRedirectUri() == "" {
-	//	w.SetError(E_UNAUTHORIZED_CLIENT, "")
-	//	return nil
-	//}
-	//if ret.AuthorizeData.IsExpiredAt(s.Now()) {
-	//	w.SetError(E_INVALID_GRANT, "")
-	//	return nil
-	//}
 
 	// TODO(ains) extract this out
 	// check redirect uri
@@ -458,47 +442,43 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		var ret *AccessData
 		var err error
 
-		if ar.ForceAccessData == nil {
-			// generate access token
-			ret = &AccessData{
-				ClientData:  ar.ClientData,
-				RedirectUri: redirectUri,
-				CreatedAt:   s.Now(),
-				ExpiresIn:   ar.Expiration,
-				UserData:    ar.UserData,
-				Scope:       ar.Scope,
-			}
+		// generate access token
+		ret = &AccessData{
+			ClientData:  ar.ClientData,
+			RedirectUri: redirectUri,
+			CreatedAt:   s.Now(),
+			ExpiresIn:   ar.Expiration,
+			UserData:    ar.UserData,
+			Scope:       ar.Scope,
+		}
 
-			// generate access token
-			ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ar)
+		// generate access token
+		ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ar)
+		if err != nil {
+			return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to generate access token"))
+		}
+
+		if ar.GenerateRefresh {
+			// Generate Refresh Token
+			rt := &RefreshTokenData{
+				ClientData: ar.ClientData,
+				CreatedAt:  s.Now(),
+				ExpiresAt:  s.Now().Add(time.Duration(ar.Expiration) * time.Second),
+				UserData:   ar.UserData,
+				Scope:      ar.Scope,
+			}
+			rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
 			if err != nil {
-				return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to generate access token"))
+				return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to generate refresh token"))
 			}
 
-			if ar.GenerateRefresh {
-				// Generate Refresh Token
-				rt := &RefreshTokenData{
-					ClientData: ar.ClientData,
-					CreatedAt:  s.Now(),
-					ExpiresAt:  s.Now().Add(time.Duration(ar.Expiration) * time.Second),
-					UserData:   ar.UserData,
-					Scope:      ar.Scope,
-				}
-				rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
-				if err != nil {
-					return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to generate refresh token"))
-				}
-
-				// Save Refresh Token
-				if err := s.Storage.SaveRefreshTokenData(ctx, rt); err != nil {
-					return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "could not save new refresh token data"))
-				}
-
-				// Attach refresh token string to output
-				resp.Data["refresh_token"] = rt.RefreshToken
+			// Save Refresh Token
+			if err := s.Storage.SaveRefreshTokenData(ctx, rt); err != nil {
+				return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "could not save new refresh token data"))
 			}
-		} else {
-			ret = ar.ForceAccessData
+
+			// Attach refresh token string to output
+			resp.Data["refresh_token"] = rt.RefreshToken
 		}
 
 		// save access token

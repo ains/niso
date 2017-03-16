@@ -43,11 +43,8 @@ type AuthorizeRequest struct {
 	// (optional) Data to be passed to storage. Not used by the library.
 	UserData interface{}
 
-	// Set if request is authorized
-	authorized bool
-
-	// HttpRequest *http.Request for special use
-	//HttpRequest *http.Request
+	// Set if request is Authorized
+	Authorized bool
 }
 
 type AuthorizeData struct {
@@ -118,7 +115,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 		CodeChallenge:       r.Form.Get("code_challenge"),
 		CodeChallengeMethod: r.Form.Get("code_challenge_method"),
 		RedirectUri:         unescapedUri,
-		authorized:          false,
+		Authorized:          false,
 	}
 
 	// must have a valid client
@@ -175,6 +172,9 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 				if matched := pkceMatcher.MatchString(codeChallenge); !matched {
 					return nil, NewNisoError(E_INVALID_REQUEST, errors.New("code_challenge invalid (rfc7636)"))
 				}
+
+				ret.CodeChallenge = codeChallenge
+				ret.CodeChallengeMethod = codeChallengeMethod
 			}
 		}
 		return ret, nil
@@ -184,15 +184,8 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 }
 
 func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizeRequest) (*Response, error) {
-
-	resp := &Response{
-		RedirectUri: ar.RedirectUri,
-	}
-
-	if ar.authorized {
+	if ar.Authorized {
 		if ar.Type == TOKEN {
-			resp.SetRedirectFragment(true)
-
 			// generate token directly
 			ret := &AccessRequest{
 				Type:            IMPLICIT,
@@ -206,11 +199,20 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizeReques
 				UserData:        ar.UserData,
 			}
 
-			return s.FinishAccessRequest(ctx, ret)
+			resp, err := s.FinishAccessRequest(ctx, ret)
+			if err != nil {
+				return nil, err
+			}
+			resp.SetRedirect(ar.RedirectUri)
+			resp.SetRedirectFragment(true)
+			return resp, err
 			//if ar.State != "" && w.InternalError == nil {
 			//	resp.Data["state"] = ar.State
 			//}
 		} else {
+			resp := NewResponse()
+			resp.SetRedirect(ar.RedirectUri)
+
 			// generate authorization token
 			ret := &AuthorizeData{
 				ClientData:  ar.ClientData,
@@ -241,11 +243,11 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizeReques
 			// redirect with code
 			resp.Data["code"] = ret.Code
 			resp.Data["state"] = ret.State
+
+			return resp, nil
 		}
 	} else {
 		// redirect with error
 		return nil, NewNisoError(E_ACCESS_DENIED, errors.New("access denied"))
 	}
-
-	return resp, nil
 }

@@ -1,10 +1,10 @@
 package niso
 
-// AllowedAuthorizeType is a collection of allowed auth request types
-type AllowedAuthorizeType []AuthorizeRequestType
+// AllowedAuthorizeTypes is a collection of allowed auth request types
+type AllowedAuthorizeTypes []AuthorizeRequestType
 
 // Exists returns true if the auth type exists in the list
-func (t AllowedAuthorizeType) Exists(rt AuthorizeRequestType) bool {
+func (t AllowedAuthorizeTypes) Exists(rt AuthorizeRequestType) bool {
 	for _, k := range t {
 		if k == rt {
 			return true
@@ -13,11 +13,11 @@ func (t AllowedAuthorizeType) Exists(rt AuthorizeRequestType) bool {
 	return false
 }
 
-// AllowedAccessType is a collection of allowed access request types
-type AllowedAccessType []AccessRequestType
+// AllowedAccessTypes is a collection of allowed access request types
+type AllowedAccessTypes []AccessRequestType
 
 // Exists returns true if the access type exists in the list
-func (t AllowedAccessType) Exists(rt AccessRequestType) bool {
+func (t AllowedAccessTypes) Exists(rt AccessRequestType) bool {
 	for _, k := range t {
 		if k == rt {
 			return true
@@ -38,10 +38,10 @@ type ServerConfig struct {
 	TokenType string
 
 	// List of allowed authorize types (only CODE by default)
-	AllowedAuthorizeTypes AllowedAuthorizeType
+	AllowedAuthorizeTypes AllowedAuthorizeTypes
 
 	// List of allowed access types (only AUTHORIZATION_CODE by default)
-	AllowedAccessTypes AllowedAccessType
+	AllowedAccessTypes AllowedAccessTypes
 
 	// If true allows client secret also in params, else only in
 	// Authorization header - default false
@@ -64,8 +64,8 @@ func NewServerConfig() *ServerConfig {
 		AuthorizationExpiration:   250,
 		AccessExpiration:          3600,
 		TokenType:                 "Bearer",
-		AllowedAuthorizeTypes:     AllowedAuthorizeType{CODE},
-		AllowedAccessTypes:        AllowedAccessType{AUTHORIZATION_CODE},
+		AllowedAuthorizeTypes:     AllowedAuthorizeTypes{CODE},
+		AllowedAccessTypes:        AllowedAccessTypes{AUTHORIZATION_CODE},
 		AllowClientSecretInParams: false,
 	}
 }

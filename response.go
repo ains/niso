@@ -7,30 +7,32 @@ import (
 	"net/url"
 )
 
-// Data for response output
+// ResponseData is the data to be serialized for response output
 type ResponseData map[string]interface{}
 
-// Response type enum
+// ResponseType enum indicates type of response
 type ResponseType int
 
+// Responses can either be data (an have a body to to be serialized) or are a redirect.
 const (
 	DATA ResponseType = iota
 	REDIRECT
 )
 
-// Server response
+// Response represents a HTTP response to be sent to the user
 type Response struct {
 	Type               ResponseType
 	StatusCode         int
 	StatusText         string
 	ErrorStatusCode    int
 	URL                string
-	RedirectUri        string
+	RedirectURI        string
 	Data               ResponseData
 	Headers            http.Header
 	redirectInFragment bool
 }
 
+// NewResponse creates a new empty response
 func NewResponse() *Response {
 	r := &Response{
 		Type:            DATA,
@@ -99,8 +101,8 @@ func (r *Response) SetRedirectFragment(f bool) {
 	r.redirectInFragment = f
 }
 
-// GetRedirectUrl returns the redirect url with all query string parameters
-func (r *Response) GetRedirectUrl() (string, error) {
+// GetRedirectURL returns the redirect url with all query string parameters
+func (r *Response) GetRedirectURL() (string, error) {
 	if r.Type != REDIRECT {
 		return "", errors.New("Not a redirect response")
 	}
@@ -138,7 +140,3 @@ func (r *Response) GetRedirectUrl() (string, error) {
 	u.Fragment = ""
 	return u.String(), nil
 }
-
-//func (r *Response) Close() {
-//	r.Storage.Close()
-//}

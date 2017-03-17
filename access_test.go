@@ -16,7 +16,7 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{AUTHORIZATION_CODE}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthUrl, nil)
+	req, err := http.NewRequest("POST", testAuthURL, nil)
 	require.NoError(t, err)
 	req.SetBasicAuth("1234", "aabbccdd")
 
@@ -43,7 +43,7 @@ func TestAccessRefreshToken(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{REFRESH_TOKEN}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthUrl, nil)
+	req, err := http.NewRequest("POST", testAuthURL, nil)
 	require.NoError(t, err)
 	req.SetBasicAuth("1234", "aabbccdd")
 
@@ -70,7 +70,7 @@ func TestAccessPassword(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{PASSWORD}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthUrl, nil)
+	req, err := http.NewRequest("POST", testAuthURL, nil)
 	require.NoError(t, err)
 	req.SetBasicAuth("1234", "aabbccdd")
 
@@ -98,7 +98,7 @@ func TestAccessClientCredentials(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{CLIENT_CREDENTIALS}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthUrl, nil)
+	req, err := http.NewRequest("POST", testAuthURL, nil)
 	require.NoError(t, err)
 
 	req.SetBasicAuth("1234", "aabbccdd")
@@ -133,7 +133,7 @@ func TestExtraScopes(t *testing.T) {
 func TestAccessAuthorizationCodePKCE(t *testing.T) {
 	testcases := map[string]struct {
 		Challenge       string
-		ChallengeMethod string
+		ChallengeMethod PKCECodeChallengeMethod
 		Verifier        string
 		ExpectedError   ErrorCode
 	}{
@@ -148,19 +148,18 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		},
 		"good, S256": {
 			Challenge:       "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-			ChallengeMethod: "S256",
+			ChallengeMethod: PKCE_S256,
 			Verifier:        "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
 		},
 		"bad, S256": {
 			Challenge:       "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-			ChallengeMethod: "S256",
+			ChallengeMethod: PKCE_S256,
 			Verifier:        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
 			ExpectedError:   E_INVALID_GRANT,
 		},
 		"missing from storage": {
-			Challenge:       "",
-			ChallengeMethod: "",
-			Verifier:        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			Challenge: "",
+			Verifier:  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
 		},
 	}
 	ctx := context.TODO()
@@ -175,12 +174,12 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 			Code:                "pkce-code",
 			ExpiresIn:           3600,
 			CreatedAt:           time.Now(),
-			RedirectUri:         testAuthUrl,
+			RedirectURI:         testAuthURL,
 			CodeChallenge:       test.Challenge,
-			CodeChallengeMethod: test.ChallengeMethod,
+			CodeChallengeMethod: PKCECodeChallengeMethod(test.ChallengeMethod),
 		})
 
-		req, err := http.NewRequest("POST", testAuthUrl, nil)
+		req, err := http.NewRequest("POST", testAuthURL, nil)
 		require.NoError(t, err)
 		req.SetBasicAuth("public-client", "")
 

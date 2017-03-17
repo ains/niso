@@ -23,14 +23,14 @@ func NewTestingStorage() *TestingStorage {
 	}
 
 	r.clients["1234"] = &ClientData{
-		ClientId:     "1234",
+		ClientID:     "1234",
 		ClientSecret: "aabbccdd",
-		RedirectUri:  "http://localhost:14000/appauth",
+		RedirectURI:  "http://localhost:14000/appauth",
 	}
 
 	r.clients["public-client"] = &ClientData{
-		ClientId:    "public-client",
-		RedirectUri: "http://localhost:14000/appauth",
+		ClientID:    "public-client",
+		RedirectURI: "http://localhost:14000/appauth",
 	}
 
 	r.authorize["9999"] = &AuthorizeData{
@@ -38,7 +38,7 @@ func NewTestingStorage() *TestingStorage {
 		Code:        "9999",
 		ExpiresIn:   3600,
 		CreatedAt:   time.Now(),
-		RedirectUri: "http://localhost:14000/appauth",
+		RedirectURI: "http://localhost:14000/appauth",
 	}
 
 	r.access["9999"] = &AccessData{
@@ -56,7 +56,7 @@ func NewTestingStorage() *TestingStorage {
 	}
 
 	r.refresh["r9999"] = &RefreshTokenData{
-		ClientId:     "1234",
+		ClientID:     "1234",
 		RefreshToken: "9999",
 	}
 

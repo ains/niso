@@ -14,10 +14,10 @@ func (t AllowedAuthorizeTypes) Exists(rt AuthorizeResponseType) bool {
 }
 
 // AllowedAccessTypes is a collection of allowed access request types
-type AllowedAccessTypes []AccessRequestType
+type AllowedAccessTypes []GrantType
 
 // Exists returns true if the access type exists in the list
-func (t AllowedAccessTypes) Exists(rt AccessRequestType) bool {
+func (t AllowedAccessTypes) Exists(rt GrantType) bool {
 	for _, k := range t {
 		if k == rt {
 			return true
@@ -52,7 +52,7 @@ type ServerConfig struct {
 
 	// Separator to support multiple URIs in ClientData.GetRedirectUri().
 	// If blank (the default), don't allow multiple URIs.
-	RedirectUriSeparator string
+	RedirectURISeparator string
 
 	// If true allows access request using GET, else only POST - default false
 	AllowGetAccessRequest bool

@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testAuthUrl string = "http://localhost:14000/appauth"
+var testAuthURL = "http://localhost:14000/appauth"
 
 func TestAuthorizeCode(t *testing.T) {
 	config := NewServerConfig()
 	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("GET", testAuthUrl, nil)
+	req, err := http.NewRequest("GET", testAuthURL, nil)
 	require.NoError(t, err)
 	req.Form = make(url.Values)
 	req.Form.Set("response_type", string(CODE))
@@ -41,7 +41,7 @@ func TestAuthorizeToken(t *testing.T) {
 	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{TOKEN}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("GET", testAuthUrl, nil)
+	req, err := http.NewRequest("GET", testAuthURL, nil)
 	require.NoError(t, err)
 
 	req.Form = make(url.Values)
@@ -70,7 +70,7 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 
 	// Public client returns an error
 	{
-		req, err := http.NewRequest("GET", testAuthUrl, nil)
+		req, err := http.NewRequest("GET", testAuthURL, nil)
 		require.NoError(t, err)
 		req.Form = make(url.Values)
 		req.Form.Set("response_type", string(CODE))
@@ -91,7 +91,7 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 
 	// Confidential client works without PKCE
 	{
-		req, err := http.NewRequest("GET", testAuthUrl, nil)
+		req, err := http.NewRequest("GET", testAuthURL, nil)
 		require.NoError(t, err)
 		req.Form = make(url.Values)
 		req.Form.Set("response_type", string(CODE))
@@ -118,7 +118,7 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("GET", testAuthUrl, nil)
+	req, err := http.NewRequest("GET", testAuthURL, nil)
 	require.NoError(t, err)
 	req.Form = make(url.Values)
 	req.Form.Set("response_type", string(CODE))
@@ -142,7 +142,7 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, challenge, token.CodeChallenge)
-	assert.Equal(t, "plain", token.CodeChallengeMethod)
+	assert.Equal(t, PKCE_PLAIN, token.CodeChallengeMethod)
 }
 
 func TestAuthorizeCodePKCES256(t *testing.T) {
@@ -152,7 +152,7 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("GET", testAuthUrl, nil)
+	req, err := http.NewRequest("GET", testAuthURL, nil)
 	require.NoError(t, err)
 	req.Form = make(url.Values)
 	req.Form.Set("response_type", string(CODE))
@@ -177,7 +177,7 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, challenge, token.CodeChallenge)
-	assert.Equal(t, "S256", token.CodeChallengeMethod)
+	assert.Equal(t, PKCE_S256, token.CodeChallengeMethod)
 }
 
 func newTestServer(config *ServerConfig) *Server {

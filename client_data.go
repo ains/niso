@@ -6,12 +6,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ClientData is the information stored for an OAuth2 client
 type ClientData struct {
-	ClientId     string // Unique identifier for this client (https://tools.ietf.org/html/rfc6749#section-2.2)
+	ClientID     string // Unique identifier for this client (https://tools.ietf.org/html/rfc6749#section-2.2)
 	ClientSecret string // OAuth2 client secret (https://tools.ietf.org/html/rfc6749#section-2.3.1)
-	RedirectUri  string // OAuth2 redirect URI
+	RedirectURI  string // OAuth2 redirect URI
 }
 
+// ValidSecret checks if the given secret is valid for this OAuth2 client
 func (c *ClientData) ValidSecret(secret string) bool {
 	// Consider doing constant time equality check
 	return secret == c.ClientSecret
@@ -31,8 +33,8 @@ func getClientDataFromBasicAuth(ctx context.Context, auth *BasicAuth, storage St
 	return clientData, err
 }
 
-func getClientData(ctx context.Context, clientId string, storage Storage) (*ClientData, error) {
-	clientData, err := storage.GetClientData(ctx, clientId)
+func getClientData(ctx context.Context, clientID string, storage Storage) (*ClientData, error) {
+	clientData, err := storage.GetClientData(ctx, clientID)
 	if err != nil {
 		if _, ok := err.(*NotFoundError); ok {
 			return nil, NewNisoError(E_UNAUTHORIZED_CLIENT, errors.Wrap(err, "could not find client"))
@@ -41,7 +43,7 @@ func getClientData(ctx context.Context, clientId string, storage Storage) (*Clie
 		return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to get client data from storage"))
 	}
 
-	if clientData.RedirectUri == "" {
+	if clientData.RedirectURI == "" {
 		return nil, NewNisoError(E_SERVER_ERROR, errors.New("client does not have a valid redirect uri set"))
 	}
 

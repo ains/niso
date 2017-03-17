@@ -2,8 +2,10 @@ package niso
 
 import "fmt"
 
+// ErrorCode is an OAuth2 error code
 type ErrorCode string
 
+// OAuth2 error codes (https://tools.ietf.org/html/rfc6749#section-4.1.2.1)
 const (
 	E_INVALID_REQUEST           ErrorCode = "invalid_request"
 	E_UNAUTHORIZED_CLIENT                 = "unauthorized_client"
@@ -17,11 +19,13 @@ const (
 	E_INVALID_CLIENT                      = "invalid_client"
 )
 
+// NisoError is a wrapper around an existing error with an OAuth2 error code
 type NisoError struct {
 	ErrorCode ErrorCode
 	Err       error
 }
 
+// NewNisoError creates a new NisoError for a response error code and wraps the original error
 func NewNisoError(code ErrorCode, error error) *NisoError {
 	return &NisoError{
 		ErrorCode: code,

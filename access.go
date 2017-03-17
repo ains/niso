@@ -11,28 +11,29 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AccessRequestType is the type for OAuth param `grant_type`
-type AccessRequestType string
+// GrantType is the type for OAuth param `grant_type`
+type GrantType string
 
+// https://tools.ietf.org/html/rfc6749#appendix-A.10
 const (
-	AUTHORIZATION_CODE AccessRequestType = "authorization_code"
-	REFRESH_TOKEN      AccessRequestType = "refresh_token"
-	PASSWORD           AccessRequestType = "password"
-	CLIENT_CREDENTIALS AccessRequestType = "client_credentials"
-	ASSERTION          AccessRequestType = "assertion"
-	IMPLICIT           AccessRequestType = "__implicit"
+	AUTHORIZATION_CODE GrantType = "authorization_code"
+	REFRESH_TOKEN      GrantType = "refresh_token"
+	PASSWORD           GrantType = "password"
+	CLIENT_CREDENTIALS GrantType = "client_credentials"
+	ASSERTION          GrantType = "assertion"
+	IMPLICIT           GrantType = "__implicit"
 )
 
 // AccessRequest is a request for access tokens
 type AccessRequest struct {
-	Type          AccessRequestType
+	GrantType     GrantType
 	Code          string
 	ClientData    *ClientData
 	AuthorizeData *AuthorizeData
 
 	PreviousRefreshToken *RefreshTokenData
 
-	RedirectUri   string
+	RedirectURI   string
 	Scope         string
 	Username      string
 	Password      string
@@ -51,8 +52,8 @@ type AccessRequest struct {
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
 
-	// HttpRequest *http.Request for special use
-	HttpRequest *http.Request
+	// HTTPRequest *http.Request for special use
+	HTTPRequest *http.Request
 
 	// Optional code_verifier as described in rfc7636
 	CodeVerifier string
@@ -73,7 +74,7 @@ type AccessData struct {
 	Scope string
 
 	// Redirect Uri from request
-	RedirectUri string
+	RedirectURI string
 
 	// Date created
 	CreatedAt time.Time
@@ -82,9 +83,10 @@ type AccessData struct {
 	UserData interface{}
 }
 
+// RefreshTokenData represents an issued refresh token, which should be persisted to storage in it's entirety
 type RefreshTokenData struct {
 	// ID of the client used to issue this refresh token
-	ClientId string
+	ClientID string
 
 	// Refresh token string
 	RefreshToken string
@@ -96,7 +98,7 @@ type RefreshTokenData struct {
 	CreatedAt time.Time
 
 	// Redirect Uri from request
-	RedirectUri string
+	RedirectURI string
 
 	// Scope requested for this refresh token
 	Scope string
@@ -120,7 +122,7 @@ func (d *AccessData) ExpireAt() time.Time {
 	return d.CreatedAt.Add(time.Duration(d.ExpiresIn) * time.Second)
 }
 
-// AccessTokenGen generates access tokens
+// AccessTokenGenerator generates access tokens and refresh tokens
 type AccessTokenGenerator interface {
 	GenerateAccessToken(ar *AccessRequest) (accessToken string, err error)
 	GenerateRefreshToken(ar *AccessRequest) (refreshToken string, err error)
@@ -140,7 +142,7 @@ func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*A
 		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "failed to parse access request form body"))
 	}
 
-	grantType := AccessRequestType(r.Form.Get("grant_type"))
+	grantType := GrantType(r.Form.Get("grant_type"))
 	if s.Config.AllowedAccessTypes.Exists(grantType) {
 		switch grantType {
 		case AUTHORIZATION_CODE:
@@ -168,12 +170,12 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 
 	// generate access token
 	ret := &AccessRequest{
-		Type:            AUTHORIZATION_CODE,
+		GrantType:       AUTHORIZATION_CODE,
 		Code:            r.Form.Get("code"),
 		CodeVerifier:    r.Form.Get("code_verifier"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		HTTPRequest:     r,
 	}
 
 	// "code" is required
@@ -195,7 +197,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	}
 
 	// authorization code must be from the client id of current request
-	if ret.AuthorizeData.ClientData.ClientId != ret.ClientData.ClientId {
+	if ret.AuthorizeData.ClientData.ClientID != ret.ClientData.ClientID {
 		return nil, NewNisoError(E_INVALID_GRANT, errors.New("invalid client id for authorization code"))
 	}
 
@@ -234,24 +236,24 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	return ret, nil
 }
 
-func extraScopes(access_scopes, refresh_scopes string) bool {
-	access_scopes_list := strings.Split(access_scopes, ",")
-	refresh_scopes_list := strings.Split(refresh_scopes, ",")
+func extraScopes(accessScopes, refreshScopes string) bool {
+	accessScopesLists := strings.Split(accessScopes, ",")
+	refreshScopesLists := strings.Split(refreshScopes, ",")
 
-	access_map := make(map[string]int)
+	accessMaps := make(map[string]int)
 
-	for _, scope := range access_scopes_list {
+	for _, scope := range accessScopesLists {
 		if scope == "" {
 			continue
 		}
-		access_map[scope] = 1
+		accessMaps[scope] = 1
 	}
 
-	for _, scope := range refresh_scopes_list {
+	for _, scope := range refreshScopesLists {
 		if scope == "" {
 			continue
 		}
-		if _, ok := access_map[scope]; !ok {
+		if _, ok := accessMaps[scope]; !ok {
 			return true
 		}
 	}
@@ -267,12 +269,12 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 
 	// generate access token
 	req := &AccessRequest{
-		Type:            REFRESH_TOKEN,
+		GrantType:       REFRESH_TOKEN,
 		Code:            r.Form.Get("refresh_token"),
 		Scope:           r.Form.Get("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		HTTPRequest:     r,
 	}
 
 	// "refresh_token" is required
@@ -294,12 +296,12 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	// client must be the same as the previous token
-	if req.PreviousRefreshToken.ClientId != req.ClientData.ClientId {
+	if req.PreviousRefreshToken.ClientID != req.ClientData.ClientID {
 		return nil, NewNisoError(E_INVALID_CLIENT, errors.New("request client id must be the same from previous token"))
 	}
 
 	// set rest of data
-	req.RedirectUri = req.PreviousRefreshToken.RedirectUri
+	req.RedirectURI = req.PreviousRefreshToken.RedirectURI
 	req.UserData = req.PreviousRefreshToken.UserData
 	if req.Scope == "" {
 		req.Scope = req.PreviousRefreshToken.Scope
@@ -321,13 +323,13 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 
 	// generate access token
 	ret := &AccessRequest{
-		Type:            PASSWORD,
+		GrantType:       PASSWORD,
 		Username:        r.Form.Get("username"),
 		Password:        r.Form.Get("password"),
 		Scope:           r.Form.Get("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		HTTPRequest:     r,
 	}
 
 	// "username" and "password" is required
@@ -346,7 +348,7 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 	ret.ClientData = clientData
 
 	// set redirect uri
-	ret.RedirectUri = FirstUri(ret.ClientData.RedirectUri, s.Config.RedirectUriSeparator)
+	ret.RedirectURI = firstURI(ret.ClientData.RedirectURI, s.Config.RedirectURISeparator)
 
 	return ret, nil
 }
@@ -360,11 +362,11 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 
 	// generate access token
 	ret := &AccessRequest{
-		Type:            CLIENT_CREDENTIALS,
+		GrantType:       CLIENT_CREDENTIALS,
 		Scope:           r.Form.Get("scope"),
 		GenerateRefresh: false,
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		HTTPRequest:     r,
 	}
 
 	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
@@ -374,7 +376,7 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 	ret.ClientData = clientData
 
 	// set redirect uri
-	ret.RedirectUri = FirstUri(ret.ClientData.RedirectUri, s.Config.RedirectUriSeparator)
+	ret.RedirectURI = firstURI(ret.ClientData.RedirectURI, s.Config.RedirectURISeparator)
 
 	return ret, nil
 }
@@ -388,13 +390,13 @@ func (s *Server) handleAssertionRequest(ctx context.Context, r *http.Request) (*
 
 	// generate access token
 	ret := &AccessRequest{
-		Type:            ASSERTION,
+		GrantType:       ASSERTION,
 		Scope:           r.Form.Get("scope"),
 		AssertionType:   r.Form.Get("assertion_type"),
 		Assertion:       r.Form.Get("assertion"),
 		GenerateRefresh: false, // assertion should NOT generate a refresh token, per the RFC
 		Expiration:      s.Config.AccessExpiration,
-		HttpRequest:     r,
+		HTTPRequest:     r,
 	}
 
 	// "assertion_type" and "assertion" is required
@@ -414,18 +416,19 @@ func (s *Server) handleAssertionRequest(ctx context.Context, r *http.Request) (*
 	ret.ClientData = clientData
 
 	// set redirect uri
-	ret.RedirectUri = FirstUri(ret.ClientData.RedirectUri, s.Config.RedirectUriSeparator)
+	ret.RedirectURI = firstURI(ret.ClientData.RedirectURI, s.Config.RedirectURISeparator)
 
 	return ret, nil
 }
 
+// FinishAccessRequest processes a given access request and returns the response or error to return to the user
 func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*Response, error) {
 	resp := NewResponse()
 
-	redirectUri := ar.RedirectUri
+	redirectURI := ar.RedirectURI
 	// Get redirect uri from AccessRequest if it's there (e.g., refresh token request)
-	if ar.RedirectUri != "" {
-		redirectUri = ar.RedirectUri
+	if ar.RedirectURI != "" {
+		redirectURI = ar.RedirectURI
 	}
 
 	if ar.Authorized {
@@ -435,7 +438,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		// generate access token
 		ret = &AccessData{
 			ClientData:  ar.ClientData,
-			RedirectUri: redirectUri,
+			RedirectURI: redirectURI,
 			CreatedAt:   s.Now(),
 			ExpiresIn:   ar.Expiration,
 			UserData:    ar.UserData,
@@ -451,7 +454,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		if ar.GenerateRefresh {
 			// Generate Refresh Token
 			rt := &RefreshTokenData{
-				ClientId:  ar.ClientData.ClientId,
+				ClientID:  ar.ClientData.ClientID,
 				CreatedAt: s.Now(),
 				ExpiresIn: ar.Expiration,
 				UserData:  ar.UserData,

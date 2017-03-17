@@ -205,7 +205,7 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 			if err != nil {
 				return nil, err
 			}
-			resp.SetRedirect(ar.RedirectURI)
+			resp.SetRedirectURL(ar.RedirectURI)
 			resp.SetRedirectFragment(true)
 			if ar.State != "" {
 				resp.Data["state"] = ar.State
@@ -215,7 +215,7 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 		}
 
 		resp := NewResponse()
-		resp.SetRedirect(ar.RedirectURI)
+		resp.SetRedirectURL(ar.RedirectURI)
 
 		// generate authorization token
 		ret := &AuthorizeData{

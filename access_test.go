@@ -33,7 +33,7 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	resp, err := server.FinishAccessRequest(ctx, ar)
 	require.NoError(t, err)
 
-	assert.Equal(t, DATA, resp.Type)
+	assert.Equal(t, DATA, resp.responseType)
 	assert.Equal(t, "1", resp.Data["access_token"])
 	assert.Equal(t, "r1", resp.Data["refresh_token"])
 }
@@ -60,7 +60,7 @@ func TestAccessRefreshToken(t *testing.T) {
 	resp, err := server.FinishAccessRequest(ctx, ar)
 	require.NoError(t, err)
 
-	assert.Equal(t, DATA, resp.Type)
+	assert.Equal(t, DATA, resp.responseType)
 	assert.Equal(t, "1", resp.Data["access_token"])
 	assert.Equal(t, "r1", resp.Data["refresh_token"])
 }
@@ -88,7 +88,7 @@ func TestAccessPassword(t *testing.T) {
 	resp, err := server.FinishAccessRequest(ctx, ar)
 	require.NoError(t, err)
 
-	assert.Equal(t, DATA, resp.Type)
+	assert.Equal(t, DATA, resp.responseType)
 	assert.Equal(t, "1", resp.Data["access_token"])
 	assert.Equal(t, "r1", resp.Data["refresh_token"])
 }
@@ -115,7 +115,7 @@ func TestAccessClientCredentials(t *testing.T) {
 	resp, err := server.FinishAccessRequest(ctx, ar)
 	require.NoError(t, err)
 
-	assert.Equal(t, DATA, resp.Type)
+	assert.Equal(t, DATA, resp.responseType)
 	assert.Equal(t, "1", resp.Data["access_token"])
 	// Refresh token should not be generated
 	assert.NotContains(t, resp.Data, "refresh_token")
@@ -202,7 +202,7 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 			resp, err := server.FinishAccessRequest(ctx, ar)
 			require.NoError(t, err)
 
-			assert.Equal(t, DATA, resp.Type)
+			assert.Equal(t, DATA, resp.responseType)
 			assert.Equal(t, "1", resp.Data["access_token"])
 			assert.Equal(t, "r1", resp.Data["refresh_token"])
 		}

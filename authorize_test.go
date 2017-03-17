@@ -32,7 +32,7 @@ func TestAuthorizeCode(t *testing.T) {
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
 	require.NoError(t, err)
 
-	assert.Equal(t, REDIRECT, resp.Type, "response type should be a redirect")
+	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
 	assert.Equal(t, "1", resp.Data["code"], "incorrect authorization code")
 }
 
@@ -57,7 +57,7 @@ func TestAuthorizeToken(t *testing.T) {
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
 	require.NoError(t, err)
 
-	assert.Equal(t, REDIRECT, resp.Type, "response type should be a redirect")
+	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
 	assert.True(t, resp.redirectInFragment, "response should be a redirect with fragment")
 	assert.Equal(t, "1", resp.Data["access_token"], "incorrect access_token")
 }
@@ -106,7 +106,7 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		resp, err := server.FinishAuthorizeRequest(ctx, ar)
 		require.NoError(t, err)
 
-		assert.Equal(t, REDIRECT, resp.Type, "response type should be a redirect")
+		assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
 		assert.Equal(t, "1", resp.Data["code"], "incorrect authorization code")
 	}
 }
@@ -135,7 +135,7 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	require.NoError(t, err)
 
 	code := resp.Data["code"].(string)
-	assert.Equal(t, REDIRECT, resp.Type, "response type should be a redirect")
+	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
 	assert.Equal(t, "1", code, "incorrect authorization code")
 
 	token, err := server.Storage.GetAuthorizeData(ctx, code)
@@ -170,7 +170,7 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	require.NoError(t, err)
 
 	code := resp.Data["code"].(string)
-	assert.Equal(t, REDIRECT, resp.Type, "response type should be a redirect")
+	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
 	assert.Equal(t, "1", code, "incorrect authorization code")
 
 	token, err := server.Storage.GetAuthorizeData(ctx, code)

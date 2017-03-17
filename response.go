@@ -21,25 +21,22 @@ const (
 
 // Response represents a HTTP response to be sent to the user
 type Response struct {
-	Type               ResponseType
-	StatusCode         int
-	StatusText         string
-	ErrorStatusCode    int
-	URL                string
-	RedirectURI        string
-	Data               ResponseData
-	Headers            http.Header
+	StatusCode int
+	Data       ResponseData
+	Headers    http.Header
+
+	responseType       ResponseType
+	redirectURL        string
 	redirectInFragment bool
 }
 
 // NewResponse creates a new empty response
 func NewResponse() *Response {
 	r := &Response{
-		Type:            DATA,
-		StatusCode:      200,
-		ErrorStatusCode: 200,
-		Data:            make(ResponseData),
-		Headers:         make(http.Header),
+		responseType: DATA,
+		StatusCode:   200,
+		Data:         make(ResponseData),
+		Headers:      make(http.Header),
 	}
 	r.Headers.Add(
 		"Cache-Control",
@@ -89,11 +86,11 @@ func NewResponse() *Response {
 //	}
 //}
 
-// SetRedirect changes the response to redirect to the given url
-func (r *Response) SetRedirect(url string) {
+// SetRedirectURL changes the response to redirect to the given url
+func (r *Response) SetRedirectURL(url string) {
 	// set redirect parameters
-	r.Type = REDIRECT
-	r.URL = url
+	r.responseType = REDIRECT
+	r.redirectURL = url
 }
 
 // SetRedirectFragment sets redirect values to be passed in fragment instead of as query parameters
@@ -103,11 +100,11 @@ func (r *Response) SetRedirectFragment(f bool) {
 
 // GetRedirectURL returns the redirect url with all query string parameters
 func (r *Response) GetRedirectURL() (string, error) {
-	if r.Type != REDIRECT {
+	if r.responseType != REDIRECT {
 		return "", errors.New("Not a redirect response")
 	}
 
-	u, err := url.Parse(r.URL)
+	u, err := url.Parse(r.redirectURL)
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +125,7 @@ func (r *Response) GetRedirectURL() (string, error) {
 
 	// https://tools.ietf.org/html/rfc6749#section-4.2.2
 	// Fragment should be encoded as application/x-www-form-urlencoded (%-escaped, spaces are represented as '+')
-	// The stdlib URL#String() doesn't make that easy to accomplish, so build this ourselves
+	// The stdlib redirectURL#String() doesn't make that easy to accomplish, so build this ourselves
 	if r.redirectInFragment {
 		u.Fragment = ""
 		redirectURI := u.String() + "#" + q.Encode()

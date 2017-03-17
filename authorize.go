@@ -184,6 +184,18 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 
 // FinishAuthorizeRequest takes in a authorization request and returns a response to the client or an error
 func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
+	resp, err := s.finishAuthorizeRequest(ctx, ar)
+	if nisoErr, ok := err.(*NisoError); err != nil && ok {
+		nisoErr.SetRedirectUri(ar.RedirectURI)
+		nisoErr.SetState(ar.State)
+
+		return resp, nisoErr
+	}
+
+	return resp, nil
+}
+
+func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
 	if ar.Authorized {
 		if ar.ResponseType == TOKEN {
 			// generate token directly
@@ -203,13 +215,13 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 			if err != nil {
 				return nil, err
 			}
+
 			resp.SetRedirectURL(ar.RedirectURI)
 			resp.SetRedirectFragment(true)
 			if ar.State != "" {
 				resp.Data["state"] = ar.State
 			}
-			return resp, err
-
+			return resp, nil
 		}
 
 		resp := NewResponse()

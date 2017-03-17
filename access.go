@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // GrantType is the type for OAuth param `grant_type`
@@ -132,14 +130,14 @@ type AccessTokenGenerator interface {
 func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
 	// Only allow GET (when AllowGetAccessRequest set) or POST
 	if r.Method == "GET" && !s.Config.AllowGetAccessRequest {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.New("GET method not allowed for access requests"))
+		return nil, NewNisoError(E_INVALID_REQUEST, "GET method not allowed for access requests")
 	} else if r.Method != "POST" {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.New("access requests must POST verb"))
+		return nil, NewNisoError(E_INVALID_REQUEST, "access requests must POST verb")
 	}
 
 	err := r.ParseForm()
 	if err != nil {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "failed to parse access request form body"))
+		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "failed to parse access request form body")
 	}
 
 	grantType := GrantType(r.Form.Get("grant_type"))
@@ -158,14 +156,14 @@ func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*A
 		}
 	}
 
-	return nil, NewNisoError(E_UNSUPPORTED_GRANT_TYPE, errors.New("unsupported grant type"))
+	return nil, NewNisoError(E_UNSUPPORTED_GRANT_TYPE, "unsupported grant type")
 }
 
 func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
 	// get client authentication
 	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
 	if err != nil {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "failed to get client authentication"))
+		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "failed to get client authentication")
 	}
 
 	// generate access token
@@ -180,7 +178,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 
 	// "code" is required
 	if ret.Code == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("no authorization code provided"))
+		return nil, NewNisoError(E_INVALID_GRANT, "no authorization code provided")
 	}
 
 	// must have a valid client
@@ -193,24 +191,24 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	// must be a valid authorization code
 	ret.AuthorizeData, err = s.Storage.GetAuthorizeData(ctx, ret.Code)
 	if err != nil {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.Wrap(err, "could not load data for authorization code"))
+		return nil, NewWrappedNisoError(E_INVALID_GRANT, err, "could not load data for authorization code")
 	}
 
 	// authorization code must be from the client id of current request
 	if ret.AuthorizeData.ClientData.ClientID != ret.ClientData.ClientID {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("invalid client id for authorization code"))
+		return nil, NewNisoError(E_INVALID_GRANT, "invalid client id for authorization code")
 	}
 
 	// authorization code must not be expired
 	if ret.AuthorizeData.IsExpiredAt(s.Now()) {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("authorization code expired"))
+		return nil, NewNisoError(E_INVALID_GRANT, "authorization code expired")
 	}
 
 	// Verify PKCE, if present in the authorization data
 	if len(ret.AuthorizeData.CodeChallenge) > 0 {
 		// https://tools.ietf.org/html/rfc7636#section-4.1
 		if matched := pkceMatcher.MatchString(ret.CodeVerifier); !matched {
-			return nil, NewNisoError(E_INVALID_REQUEST, errors.New("code_verifier invalid (rfc7636)"))
+			return nil, NewNisoError(E_INVALID_REQUEST, "code_verifier invalid (rfc7636)")
 		}
 
 		// https: //tools.ietf.org/html/rfc7636#section-4.6
@@ -222,10 +220,10 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 			hash := sha256.Sum256([]byte(ret.CodeVerifier))
 			codeVerifier = base64.RawURLEncoding.EncodeToString(hash[:])
 		default:
-			return nil, NewNisoError(E_INVALID_REQUEST, errors.New("code_challenge_method transform algorithm not supported (rfc7636)"))
+			return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge_method transform algorithm not supported (rfc7636)")
 		}
 		if codeVerifier != ret.AuthorizeData.CodeChallenge {
-			return nil, NewNisoError(E_INVALID_GRANT, errors.New("code_verifier failed comparison with code_challenge"))
+			return nil, NewNisoError(E_INVALID_GRANT, "code_verifier failed comparison with code_challenge")
 		}
 	}
 
@@ -279,7 +277,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 
 	// "refresh_token" is required
 	if req.Code == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("no refresh token provided"))
+		return nil, NewNisoError(E_INVALID_GRANT, "no refresh token provided")
 	}
 
 	// must have a valid client
@@ -292,12 +290,12 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	// must be a valid refresh code
 	req.PreviousRefreshToken, err = s.Storage.GetRefreshTokenData(ctx, req.Code)
 	if err != nil {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.Wrap(err, "failed to get refresh token data from storage"))
+		return nil, NewWrappedNisoError(E_INVALID_GRANT, err, "failed to get refresh token data from storage")
 	}
 
 	// client must be the same as the previous token
 	if req.PreviousRefreshToken.ClientID != req.ClientData.ClientID {
-		return nil, NewNisoError(E_INVALID_CLIENT, errors.New("request client id must be the same from previous token"))
+		return nil, NewNisoError(E_INVALID_CLIENT, "request client id must be the same from previous token")
 	}
 
 	// set rest of data
@@ -308,7 +306,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	if extraScopes(req.PreviousRefreshToken.Scope, req.Scope) {
-		return nil, NewNisoError(E_ACCESS_DENIED, errors.New("the requested scope must not include any scope not originally granted by the resource owner"))
+		return nil, NewNisoError(E_ACCESS_DENIED, "the requested scope must not include any scope not originally granted by the resource owner")
 	}
 
 	return req, nil
@@ -334,10 +332,10 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 
 	// "username" and "password" is required
 	if ret.Username == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("username field not set"))
+		return nil, NewNisoError(E_INVALID_GRANT, "username field not set")
 	}
 	if ret.Password == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("password field not set"))
+		return nil, NewNisoError(E_INVALID_GRANT, "password field not set")
 	}
 
 	// must have a valid client
@@ -402,10 +400,10 @@ func (s *Server) handleAssertionRequest(ctx context.Context, r *http.Request) (*
 	// "assertion_type" and "assertion" is required
 	// "username" and "password" is required
 	if ret.AssertionType == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("assertion_type field not set"))
+		return nil, NewNisoError(E_INVALID_GRANT, "assertion_type field not set")
 	}
 	if ret.Assertion == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, errors.New("assertion field not set"))
+		return nil, NewNisoError(E_INVALID_GRANT, "assertion field not set")
 	}
 
 	// must have a valid client
@@ -448,7 +446,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		// generate access token
 		ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ar)
 		if err != nil {
-			return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to generate access token"))
+			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to generate access token")
 		}
 
 		if ar.GenerateRefresh {
@@ -462,12 +460,12 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 			}
 			rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
 			if err != nil {
-				return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to generate refresh token"))
+				return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to generate refresh token")
 			}
 
 			// Save Refresh Token
 			if err := s.Storage.SaveRefreshTokenData(ctx, rt); err != nil {
-				return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "could not save new refresh token data"))
+				return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "could not save new refresh token data")
 			}
 
 			// Attach refresh token string to output
@@ -476,7 +474,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 
 		// save access token
 		if err = s.Storage.SaveAccessData(ctx, ret); err != nil {
-			return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "failed to save access data"))
+			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to save access data")
 		}
 
 		// remove authorization token
@@ -498,7 +496,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 			resp.Data["scope"] = ar.Scope
 		}
 	} else {
-		return nil, NewNisoError(E_ACCESS_DENIED, errors.New("access denied"))
+		return nil, NewNisoError(E_ACCESS_DENIED, "access denied")
 	}
 
 	return resp, nil

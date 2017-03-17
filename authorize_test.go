@@ -86,7 +86,7 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 			"expected invalid_request error",
 		)
 		require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
-		assert.Equal(t, E_INVALID_REQUEST, err.(*NisoError).ErrorCode)
+		assert.Equal(t, E_INVALID_REQUEST, err.(*NisoError).Code)
 	}
 
 	// Confidential client works without PKCE

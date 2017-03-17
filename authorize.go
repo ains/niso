@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"regexp"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // AuthorizeResponseType is the type for OAuth param `response_type`
@@ -115,7 +113,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	//create the authorization request
 	unescapedURI, err := url.QueryUnescape(r.Form.Get("redirect_uri"))
 	if err != nil {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "redirect_uri is not a valid url-encoded string"))
+		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "redirect_uri is not a valid url-encoded string")
 	}
 
 	ret := &AuthorizationRequest{
@@ -141,7 +139,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	}
 
 	if err = validateURIList(clientRedirectURI, ret.RedirectURI, s.Config.RedirectURISeparator); err != nil {
-		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "specified redirect_uri not valid for the given client_id"))
+		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "specified redirect_uri not valid for the given client_id")
 	}
 
 	ret.ResponseType = AuthorizeResponseType(r.Form.Get("response_type"))
@@ -156,7 +154,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 			if codeChallenge := ret.CodeChallenge; len(codeChallenge) == 0 {
 				if s.Config.RequirePKCEForPublicClients && ret.ClientData.ClientSecret == "" {
 					// https://tools.ietf.org/html/rfc7636#section-4.4.1
-					return nil, NewNisoError(E_INVALID_REQUEST, errors.New("code_challenge (rfc7636) required for public clients"))
+					return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge (rfc7636) required for public clients")
 				}
 			} else {
 				codeChallengeMethod := ret.CodeChallengeMethod
@@ -166,12 +164,12 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 				}
 				if codeChallengeMethod != PKCE_PLAIN && codeChallengeMethod != PKCE_S256 {
 					// https://tools.ietf.org/html/rfc7636#section-4.4.1
-					return nil, NewNisoError(E_INVALID_REQUEST, errors.New("code_challenge_method transform algorithm not supported (rfc7636)"))
+					return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge_method transform algorithm not supported (rfc7636)")
 				}
 
 				// https://tools.ietf.org/html/rfc7636#section-4.2
 				if matched := pkceMatcher.MatchString(codeChallenge); !matched {
-					return nil, NewNisoError(E_INVALID_REQUEST, errors.New("code_challenge invalid (rfc7636)"))
+					return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge invalid (rfc7636)")
 				}
 
 				ret.CodeChallenge = codeChallenge
@@ -181,7 +179,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 		return ret, nil
 	}
 
-	return nil, NewNisoError(E_UNSUPPORTED_RESPONSE_TYPE, errors.New("Request type not in server allowed authorize types"))
+	return nil, NewNisoError(E_UNSUPPORTED_RESPONSE_TYPE, "Request type not in server allowed authorize types")
 }
 
 // FinishAuthorizeRequest takes in a authorization request and returns a response to the client or an error
@@ -234,14 +232,14 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 		// generate token code
 		code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ret)
 		if err != nil {
-			return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "Failed to generate authorize token"))
+			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to generate authorize token")
 
 		}
 		ret.Code = code
 
 		// save authorization token
 		if err = s.Storage.SaveAuthorizeData(ctx, ret); err != nil {
-			return nil, NewNisoError(E_SERVER_ERROR, errors.Wrap(err, "Failed to save authorize data"))
+			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to save authorize data")
 		}
 
 		// redirect with code
@@ -251,5 +249,5 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 	}
 
 	// redirect with error
-	return nil, NewNisoError(E_ACCESS_DENIED, errors.New("access denied"))
+	return nil, NewNisoError(E_ACCESS_DENIED, "access denied")
 }

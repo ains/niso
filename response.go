@@ -47,45 +47,6 @@ func NewResponse() *Response {
 	return r
 }
 
-// SetError sets an error id and description on the Response
-// state and uri are left blank
-//func (r *Response) SetError(id string, description string) {
-//	r.SetErrorUri(id, description, "", "")
-//}
-//
-//// SetErrorState sets an error id, description, and state on the Response
-//// uri is left blank
-//func (r *Response) SetErrorState(id string, description string, state string) {
-//	r.SetErrorUri(id, description, "", state)
-//}
-
-// SetErrorUri sets an error id, description, state, and uri on the Response
-//func (r *Response) SetErrorUri(id string, description string, uri string, state string) {
-//	// get default error message
-//	if description == "" {
-//		//description = deferror.Get(id)
-//	}
-//
-//	// set error parameters
-//	r.IsError = true
-//	r.ErrorId = id
-//	r.StatusCode = r.ErrorStatusCode
-//	if r.StatusCode != 200 {
-//		r.StatusText = description
-//	} else {
-//		r.StatusText = ""
-//	}
-//	r.Data = make(ResponseData) // clear output
-//	r.Data["error"] = id
-//	r.Data["error_description"] = description
-//	if uri != "" {
-//		r.Data["error_uri"] = uri
-//	}
-//	if state != "" {
-//		r.Data["state"] = state
-//	}
-//}
-
 // SetRedirectURL changes the response to redirect to the given url
 func (r *Response) SetRedirectURL(url string) {
 	// set redirect parameters

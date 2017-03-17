@@ -1,10 +1,10 @@
 package niso
 
 // AllowedAuthorizeTypes is a collection of allowed auth request types
-type AllowedAuthorizeTypes []AuthorizeRequestType
+type AllowedAuthorizeTypes []AuthorizeResponseType
 
 // Exists returns true if the auth type exists in the list
-func (t AllowedAuthorizeTypes) Exists(rt AuthorizeRequestType) bool {
+func (t AllowedAuthorizeTypes) Exists(rt AuthorizeResponseType) bool {
 	for _, k := range t {
 		if k == rt {
 			return true

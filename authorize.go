@@ -10,12 +10,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AuthorizeRequestType is the type for OAuth param `response_type`
-type AuthorizeRequestType string
+// AuthorizeResponseType is the type for OAuth param `response_type`
+type AuthorizeResponseType string
 
 const (
-	CODE  AuthorizeRequestType = "code"
-	TOKEN AuthorizeRequestType = "token"
+	CODE  AuthorizeResponseType = "code"
+	TOKEN AuthorizeResponseType = "token"
 
 	PKCE_PLAIN = "plain"
 	PKCE_S256  = "S256"
@@ -25,12 +25,12 @@ var (
 	pkceMatcher = regexp.MustCompile("^[a-zA-Z0-9~._-]{43,128}$")
 )
 
-type AuthorizeRequest struct {
-	Type        AuthorizeRequestType
-	ClientData  *ClientData
-	Scope       string
-	RedirectUri string
-	State       string
+type AuthorizationRequest struct {
+	ResponseType AuthorizeResponseType
+	ClientData   *ClientData
+	Scope        string
+	RedirectUri  string
+	State        string
 
 	// Token expiration in seconds. Change if different from default.
 	// If type = TOKEN, this expiration will be for the ACCESS token.
@@ -99,8 +99,8 @@ type AuthorizeTokenGenerator interface {
 	GenerateAuthorizeToken(data *AuthorizeData) (string, error)
 }
 
-// GenerateAuthorizeRequest handles authorization requests. Generates an AuthorizeRequest from a HTTP request.
-func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) (*AuthorizeRequest, error) {
+// GenerateAuthorizeRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
+func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
 	r.ParseForm()
 
 	//create the authorization request
@@ -109,7 +109,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "redirect_uri is not a valid url-encoded string"))
 	}
 
-	ret := &AuthorizeRequest{
+	ret := &AuthorizationRequest{
 		State:               r.Form.Get("state"),
 		Scope:               r.Form.Get("scope"),
 		CodeChallenge:       r.Form.Get("code_challenge"),
@@ -135,12 +135,12 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 		return nil, NewNisoError(E_INVALID_REQUEST, errors.Wrap(err, "specified redirect_uri not valid for the given client_id"))
 	}
 
-	ret.Type = AuthorizeRequestType(r.Form.Get("response_type"))
+	ret.ResponseType = AuthorizeResponseType(r.Form.Get("response_type"))
 
-	if s.Config.AllowedAuthorizeTypes.Exists(ret.Type) {
+	if s.Config.AllowedAuthorizeTypes.Exists(ret.ResponseType) {
 		ret.Expiration = s.Config.AuthorizationExpiration
 
-		switch ret.Type {
+		switch ret.ResponseType {
 		case CODE:
 
 			// Optional PKCE support (https://tools.ietf.org/html/rfc7636)
@@ -175,9 +175,9 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	return nil, NewNisoError(E_UNSUPPORTED_RESPONSE_TYPE, errors.New("Request type not in server allowed authorize types"))
 }
 
-func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizeRequest) (*Response, error) {
+func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
 	if ar.Authorized {
-		if ar.Type == TOKEN {
+		if ar.ResponseType == TOKEN {
 			// generate token directly
 			ret := &AccessRequest{
 				Type:            IMPLICIT,

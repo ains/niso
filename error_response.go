@@ -2,6 +2,7 @@ package niso
 
 import "net/http"
 
+// WriteErrorResponse redirects the user or encodes the error to JSON and writes to the http.ResponseWriter
 func WriteErrorResponse(w http.ResponseWriter, error error) error {
 	var nisoErr *NisoError
 	if ne, ok := error.(*NisoError); ok {
@@ -11,7 +12,7 @@ func WriteErrorResponse(w http.ResponseWriter, error error) error {
 	}
 
 	// Redirect user if needed
-	loc, err := nisoErr.GetRedirectUri()
+	loc, err := nisoErr.GetRedirectURI()
 	if err != nil {
 		return err
 	}

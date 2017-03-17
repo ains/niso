@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Code is an OAuth2 error code
+// ErrorCode is an OAuth2 error code
 type ErrorCode string
 
 // OAuth2 error codes (https://tools.ietf.org/html/rfc6749#section-4.1.2.1)
@@ -59,10 +59,12 @@ func NewWrappedNisoError(code ErrorCode, error error, message string) *NisoError
 	}
 }
 
-func (e *NisoError) SetRedirectUri(redirectUri string) {
-	e.redirectURI = redirectUri
+// SetRedirectURI set redirect uri for this error to redirect to when written to a HTTP response
+func (e *NisoError) SetRedirectURI(redirectURI string) {
+	e.redirectURI = redirectURI
 }
 
+// SetState sets the "state" parameter to be returned to the user when this error is rendered
 func (e *NisoError) SetState(state string) {
 	e.state = state
 }
@@ -71,7 +73,8 @@ func (e *NisoError) Error() string {
 	return fmt.Sprintf("(%s) %s", e.Code, e.Err.Error())
 }
 
-func (e *NisoError) GetRedirectUri() (string, error) {
+// GetRedirectURI returns location to redirect user to after processing this error, or empty string if there is none
+func (e *NisoError) GetRedirectURI() (string, error) {
 	if e.redirectURI == "" {
 		return "", nil
 	}
@@ -93,6 +96,7 @@ func (e *NisoError) GetRedirectUri() (string, error) {
 	return u.String(), nil
 }
 
+// GetResponseDict returns the fields for an error response as defined in https://tools.ietf.org/html/rfc6749#section-4.2.2.1
 func (e *NisoError) GetResponseDict() map[string]string {
 	return map[string]string{
 		"error":             string(e.Code),

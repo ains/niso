@@ -186,7 +186,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
 	resp, err := s.finishAuthorizeRequest(ctx, ar)
 	if nisoErr, ok := err.(*NisoError); err != nil && ok {
-		nisoErr.SetRedirectUri(ar.RedirectURI)
+		nisoErr.SetRedirectURI(ar.RedirectURI)
 		nisoErr.SetState(ar.State)
 
 		return resp, nisoErr

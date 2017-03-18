@@ -18,7 +18,6 @@ const (
 	REFRESH_TOKEN      GrantType = "refresh_token"
 	PASSWORD           GrantType = "password"
 	CLIENT_CREDENTIALS GrantType = "client_credentials"
-	ASSERTION          GrantType = "assertion"
 	IMPLICIT           GrantType = "__implicit"
 )
 
@@ -151,8 +150,6 @@ func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*A
 			return s.handlePasswordRequest(ctx, r)
 		case CLIENT_CREDENTIALS:
 			return s.handleClientCredentialsRequest(ctx, r)
-		case ASSERTION:
-			return s.handleAssertionRequest(ctx, r)
 		}
 	}
 
@@ -367,46 +364,6 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 		HTTPRequest:     r,
 	}
 
-	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
-	if err != nil {
-		return nil, err
-	}
-	ret.ClientData = clientData
-
-	// set redirect uri
-	ret.RedirectURI = firstURI(ret.ClientData.RedirectURI, s.Config.RedirectURISeparator)
-
-	return ret, nil
-}
-
-func (s *Server) handleAssertionRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
-	// get client authentication
-	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
-	if err != nil {
-		return nil, err
-	}
-
-	// generate access token
-	ret := &AccessRequest{
-		GrantType:       ASSERTION,
-		Scope:           r.Form.Get("scope"),
-		AssertionType:   r.Form.Get("assertion_type"),
-		Assertion:       r.Form.Get("assertion"),
-		GenerateRefresh: false, // assertion should NOT generate a refresh token, per the RFC
-		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
-	}
-
-	// "assertion_type" and "assertion" is required
-	// "username" and "password" is required
-	if ret.AssertionType == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, "assertion_type field not set")
-	}
-	if ret.Assertion == "" {
-		return nil, NewNisoError(E_INVALID_GRANT, "assertion field not set")
-	}
-
-	// must have a valid client
 	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
 	if err != nil {
 		return nil, err

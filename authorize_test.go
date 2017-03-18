@@ -36,6 +36,36 @@ func TestAuthorizeCode(t *testing.T) {
 	assert.Equal(t, "1", resp.Data["code"], "incorrect authorization code")
 }
 
+func TestAuthorizeCodeAccessDenied(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	server := newTestServer(config)
+
+	req, err := http.NewRequest("GET", testAuthURL, nil)
+	require.NoError(t, err)
+	req.Form = make(url.Values)
+	req.Form.Set("response_type", string(CODE))
+	req.Form.Set("client_id", "1234")
+	req.Form.Set("state", "a")
+
+	ctx := context.TODO()
+	ar, err := server.GenerateAuthorizeRequest(ctx, req)
+	require.NoError(t, err)
+
+	ar.Authorized = false
+	_, err = server.FinishAuthorizeRequest(ctx, ar)
+	require.EqualError(
+		t,
+		err,
+		"(access_denied) access denied",
+		"expected access_denied error",
+	)
+	require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
+	assert.Equal(t, E_ACCESS_DENIED, err.(*NisoError).Code)
+	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:14000/appauth?error=access_denied&error_description=access+denied&state=a", redirectURI)}
+
 func TestAuthorizeInvalidClient(t *testing.T) {
 	config := NewServerConfig()
 	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
@@ -58,6 +88,61 @@ func TestAuthorizeInvalidClient(t *testing.T) {
 	)
 	require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
 	assert.Equal(t, E_UNAUTHORIZED_CLIENT, err.(*NisoError).Code)
+	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	require.NoError(t, err)
+	assert.Equal(t, "", redirectURI)
+}
+
+func TestAuthorizeInvalidRedirectURI(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	server := newTestServer(config)
+
+	req, err := http.NewRequest("GET", testAuthURL, nil)
+	require.NoError(t, err)
+	req.Form = make(url.Values)
+	req.Form.Set("response_type", string(CODE))
+	req.Form.Set("client_id", "1234")
+	req.Form.Set("redirect_uri", "invalid")
+	req.Form.Set("state", "a")
+
+	ctx := context.TODO()
+	_, err = server.GenerateAuthorizeRequest(ctx, req)
+	require.EqualError(
+		t,
+		err,
+		"(invalid_request) specified redirect_uri not valid for the given client_id: no matching uri found in allowed uri list: http://localhost:14000/appauth / invalid",
+		"expected invalid_request error",
+	)
+	require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
+	assert.Equal(t, E_INVALID_REQUEST, err.(*NisoError).Code)
+	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	require.NoError(t, err)
+	assert.Equal(t, "", redirectURI)
+}
+
+func TestAuthorizeInvalidAuthorizeType(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{}
+	server := newTestServer(config)
+
+	req, err := http.NewRequest("GET", testAuthURL, nil)
+	require.NoError(t, err)
+	req.Form = make(url.Values)
+	req.Form.Set("response_type", string(CODE))
+	req.Form.Set("client_id", "1234")
+	req.Form.Set("state", "a")
+
+	ctx := context.TODO()
+	_, err = server.GenerateAuthorizeRequest(ctx, req)
+	require.EqualError(
+		t,
+		err,
+		"(unsupported_response_type) request type not in server allowed authorize types",
+		"expected unsupported_response_type error",
+	)
+	require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
+	assert.Equal(t, E_UNSUPPORTED_RESPONSE_TYPE, err.(*NisoError).Code)
 }
 
 func TestAuthorizeToken(t *testing.T) {
@@ -203,6 +288,35 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	assert.Equal(t, challenge, token.CodeChallenge)
 	assert.Equal(t, PKCE_S256, token.CodeChallengeMethod)
 }
+
+func TestAuthorizeCodeInvalidChallengeMethod(t *testing.T) {
+	challenge := "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	server := newTestServer(config)
+
+	req, err := http.NewRequest("GET", testAuthURL, nil)
+	require.NoError(t, err)
+	req.Form = make(url.Values)
+	req.Form.Set("response_type", string(CODE))
+	req.Form.Set("client_id", "1234")
+	req.Form.Set("state", "a")
+	req.Form.Set("code_challenge", challenge)
+	req.Form.Set("code_challenge_method", "invalid")
+
+	ctx := context.TODO()
+	_, err = server.GenerateAuthorizeRequest(ctx, req)
+	require.EqualError(
+		t,
+		err,
+		"(invalid_request) code_challenge_method transform algorithm not supported (rfc7636)",
+		"expected invalid_request error",
+	)
+	require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
+	assert.Equal(t, E_INVALID_REQUEST, err.(*NisoError).Code)
+}
+
 
 func newTestServer(config *ServerConfig) *Server {
 	server := NewServer(config, NewTestingStorage())

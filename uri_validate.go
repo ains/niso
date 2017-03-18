@@ -45,7 +45,7 @@ func validateURIList(baseURIList string, redirectURI string, separator string) e
 		}
 	}
 
-	return newURIValidationError("urls don't validate", baseURIList, redirectURI)
+	return newURIValidationError("no matching uri found in allowed uri list", baseURIList, redirectURI)
 }
 
 // validateURI validates that redirectURI is contained in baseUri

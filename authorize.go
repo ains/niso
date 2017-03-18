@@ -196,7 +196,7 @@ func (s *Server) generateAuthorizeRequest(ctx context.Context, ret *Authorizatio
 		return ret, nil
 	}
 
-	return nil, NewNisoError(E_UNSUPPORTED_RESPONSE_TYPE, "Request type not in server allowed authorize types")
+	return nil, NewNisoError(E_UNSUPPORTED_RESPONSE_TYPE, "request type not in server allowed authorize types")
 }
 
 // FinishAuthorizeRequest takes in a authorization request and returns a response to the client or an error

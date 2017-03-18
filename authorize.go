@@ -110,19 +110,10 @@ type AuthorizeTokenGenerator interface {
 func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
 	r.ParseForm()
 
-	//create the authorization request
-	unescapedURI, err := url.QueryUnescape(r.Form.Get("redirect_uri"))
+	reqRedirectURI, err := url.QueryUnescape(r.Form.Get("redirect_uri"))
+	reqState := r.Form.Get("state")
 	if err != nil {
 		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "redirect_uri is not a valid url-encoded string")
-	}
-
-	ret := &AuthorizationRequest{
-		State:               r.Form.Get("state"),
-		Scope:               r.Form.Get("scope"),
-		CodeChallenge:       r.Form.Get("code_challenge"),
-		CodeChallengeMethod: PKCECodeChallengeMethod(r.Form.Get("code_challenge_method")),
-		RedirectURI:         unescapedURI,
-		Authorized:          false,
 	}
 
 	// must have a valid client
@@ -130,26 +121,51 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	if err != nil {
 		return nil, err
 	}
-	ret.ClientData = clientData
 
 	// check redirect uri, if there are multiple client redirect uri's don't set the uri
 	clientRedirectURI := clientData.RedirectURI
-	if ret.RedirectURI == "" && firstURI(clientRedirectURI, s.Config.RedirectURISeparator) == clientRedirectURI {
-		ret.RedirectURI = firstURI(clientRedirectURI, s.Config.RedirectURISeparator)
+	URISeparator := s.Config.RedirectURISeparator
+	if reqRedirectURI == "" && firstURI(clientRedirectURI, URISeparator) == clientRedirectURI {
+		reqRedirectURI = firstURI(clientRedirectURI, URISeparator)
 	}
-
-	if err = validateURIList(clientRedirectURI, ret.RedirectURI, s.Config.RedirectURISeparator); err != nil {
+	if err = validateURIList(clientRedirectURI, reqRedirectURI, URISeparator); err != nil {
 		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "specified redirect_uri not valid for the given client_id")
 	}
 
-	ret.ResponseType = AuthorizeResponseType(r.Form.Get("response_type"))
+	ar := &AuthorizationRequest{
+		State:               r.Form.Get("state"),
+		Scope:               r.Form.Get("scope"),
+		ResponseType:        AuthorizeResponseType(r.Form.Get("response_type")),
+		CodeChallenge:       r.Form.Get("code_challenge"),
+		CodeChallengeMethod: PKCECodeChallengeMethod(r.Form.Get("code_challenge_method")),
+		Authorized:          false,
+	}
+	ar.ClientData = clientData
+	ar.RedirectURI = reqRedirectURI
 
+	ret, err := s.generateAuthorizeRequest(ctx, ar)
+	if err != nil {
+		// errors caused by invalid client identifiers or redirect URIs will not cause redirects
+		// if an error occurs post redirect uri validation, redirect
+		// (https://tools.ietf.org/html/rfc6749#section-4.1.2.1)
+		if nisoErr, ok := err.(*NisoError); ok {
+			nisoErr.SetRedirectURI(reqRedirectURI)
+			nisoErr.SetState(reqState)
+
+			return nil, nisoErr
+		}
+
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (s *Server) generateAuthorizeRequest(ctx context.Context, ret *AuthorizationRequest) (*AuthorizationRequest, error) {
 	if s.Config.AllowedAuthorizeTypes.Exists(ret.ResponseType) {
 		ret.Expiration = s.Config.AuthorizationExpiration
 
-		switch ret.ResponseType {
-		case CODE:
-
+		if ret.ResponseType == CODE {
 			// Optional PKCE support (https://tools.ietf.org/html/rfc7636)
 			if codeChallenge := ret.CodeChallenge; len(codeChallenge) == 0 {
 				if s.Config.RequirePKCEForPublicClients && ret.ClientData.ClientSecret == "" {
@@ -176,6 +192,7 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 				ret.CodeChallengeMethod = codeChallengeMethod
 			}
 		}
+
 		return ret, nil
 	}
 
@@ -185,11 +202,15 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 // FinishAuthorizeRequest takes in a authorization request and returns a response to the client or an error
 func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
 	resp, err := s.finishAuthorizeRequest(ctx, ar)
-	if nisoErr, ok := err.(*NisoError); err != nil && ok {
-		nisoErr.SetRedirectURI(ar.RedirectURI)
-		nisoErr.SetState(ar.State)
+	if err != nil {
+		if nisoErr, ok := err.(*NisoError); ok {
+			nisoErr.SetRedirectURI(ar.RedirectURI)
+			nisoErr.SetState(ar.State)
 
-		return resp, nisoErr
+			return nil, nisoErr
+		}
+
+		return nil, err
 	}
 
 	return resp, nil

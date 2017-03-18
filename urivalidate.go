@@ -19,7 +19,7 @@ func newURIValidationError(msg string, base string, redirect string) URIValidati
 	return URIValidationError(fmt.Sprintf("%s: %s / %s", msg, base, redirect))
 }
 
-// validateURIList validates that redirectUri is contained in baseUriList.
+// validateURIList validates that redirectURI is contained in baseUriList.
 // baseUriList may be a string separated by separator.
 // If separator is blank, validate only 1 URI.
 func validateURIList(baseURIList string, redirectURI string, separator string) error {
@@ -48,7 +48,7 @@ func validateURIList(baseURIList string, redirectURI string, separator string) e
 	return newURIValidationError("urls don't validate", baseURIList, redirectURI)
 }
 
-// validateURI validates that redirectUri is contained in baseUri
+// validateURI validates that redirectURI is contained in baseUri
 func validateURI(baseURI string, redirectURI string) error {
 	if baseURI == "" || redirectURI == "" {
 		return errors.New("urls cannot be blank")

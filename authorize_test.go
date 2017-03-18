@@ -36,6 +36,30 @@ func TestAuthorizeCode(t *testing.T) {
 	assert.Equal(t, "1", resp.Data["code"], "incorrect authorization code")
 }
 
+func TestAuthorizeInvalidClient(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	server := newTestServer(config)
+
+	req, err := http.NewRequest("GET", testAuthURL, nil)
+	require.NoError(t, err)
+	req.Form = make(url.Values)
+	req.Form.Set("response_type", string(CODE))
+	req.Form.Set("client_id", "invalid")
+	req.Form.Set("state", "a")
+
+	ctx := context.TODO()
+	_, err = server.GenerateAuthorizeRequest(ctx, req)
+	require.EqualError(
+		t,
+		err,
+		"(unauthorized_client) could not find client: client not found",
+		"expected unauthorized_client error",
+	)
+	require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
+	assert.Equal(t, E_UNAUTHORIZED_CLIENT, err.(*NisoError).Code)
+}
+
 func TestAuthorizeToken(t *testing.T) {
 	config := NewServerConfig()
 	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{TOKEN}

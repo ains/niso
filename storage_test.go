@@ -75,7 +75,7 @@ func (s *TestingStorage) GetClientData(_ context.Context, id string) (*ClientDat
 	if c, ok := s.clients[id]; ok {
 		return c, nil
 	}
-	return nil, errors.New("Client not found")
+	return nil, &NotFoundError{err: errors.New("client not found")}
 }
 
 func (s *TestingStorage) SetClient(id string, client *ClientData) error {
@@ -92,7 +92,7 @@ func (s *TestingStorage) GetAuthorizeData(_ context.Context, code string) (*Auth
 	if d, ok := s.authorize[code]; ok {
 		return d, nil
 	}
-	return nil, errors.New("Authorize not found")
+	return nil, errors.New("authorize not found")
 }
 
 func (s *TestingStorage) DeleteAuthorizeData(ctx context.Context, code string) error {
@@ -109,7 +109,7 @@ func (s *TestingStorage) LoadAccess(code string) (*AccessData, error) {
 	if d, ok := s.access[code]; ok {
 		return d, nil
 	}
-	return nil, errors.New("Access not found")
+	return nil, errors.New("access not found")
 }
 
 func (s *TestingStorage) GetRefreshTokenData(ctx context.Context, token string) (*RefreshTokenData, error) {

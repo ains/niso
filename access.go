@@ -88,9 +88,6 @@ type RefreshTokenData struct {
 	// Refresh token string
 	RefreshToken string
 
-	// Token expiration in seconds
-	ExpiresIn int32
-
 	// Time at which refresh token was created
 	CreatedAt time.Time
 
@@ -102,11 +99,6 @@ type RefreshTokenData struct {
 
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
-}
-
-// IsExpired returns true if access expired
-func (d *AccessData) IsExpired() bool {
-	return d.IsExpiredAt(time.Now())
 }
 
 // IsExpiredAt returns true if access expires at time 't'
@@ -411,7 +403,6 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 			rt := &RefreshTokenData{
 				ClientID:  ar.ClientData.ClientID,
 				CreatedAt: s.Now(),
-				ExpiresIn: ar.Expiration,
 				UserData:  ar.UserData,
 				Scope:     ar.Scope,
 			}

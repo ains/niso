@@ -86,11 +86,6 @@ type AuthorizeData struct {
 	CodeChallengeMethod PKCECodeChallengeMethod
 }
 
-// IsExpired is true if authorization expired
-func (d *AuthorizeData) IsExpired() bool {
-	return d.IsExpiredAt(time.Now())
-}
-
 // IsExpiredAt is true if authorization has expired by time 't'
 func (d *AuthorizeData) IsExpiredAt(t time.Time) bool {
 	return d.ExpireAt().Before(t)

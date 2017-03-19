@@ -26,7 +26,7 @@ func (a *DefaultAccessTokenGenerator) GenerateAccessToken(ar *AccessRequest) (st
 	return base64.RawURLEncoding.EncodeToString([]byte(token)), nil
 }
 
-// GenerateAccessToken generates base64-encoded UUID access and refresh tokens
+// GenerateRefreshToken generates base64-encoded UUID access and refresh tokens
 func (a *DefaultAccessTokenGenerator) GenerateRefreshToken(ar *AccessRequest) (string, error) {
 	token := uuid.NewRandom()
 	return base64.RawURLEncoding.EncodeToString([]byte(token)), nil

@@ -48,23 +48,12 @@ func NewTestingStorage() *TestingStorage {
 		CreatedAt:   time.Now(),
 	}
 
-	r.access["r9999"] = &AccessData{
-		ClientData:  r.clients["1234"],
-		AccessToken: "9999",
-		ExpiresIn:   3600,
-		CreatedAt:   time.Now(),
-	}
-
 	r.refresh["r9999"] = &RefreshTokenData{
 		ClientID:     "1234",
 		RefreshToken: "9999",
 	}
 
 	return r
-}
-
-func (s *TestingStorage) Clone() Storage {
-	return s
 }
 
 func (s *TestingStorage) Close() error {
@@ -103,13 +92,6 @@ func (s *TestingStorage) DeleteAuthorizeData(ctx context.Context, code string) e
 func (s *TestingStorage) SaveAccessData(ctx context.Context, data *AccessData) error {
 	s.access[data.AccessToken] = data
 	return nil
-}
-
-func (s *TestingStorage) LoadAccess(code string) (*AccessData, error) {
-	if d, ok := s.access[code]; ok {
-		return d, nil
-	}
-	return nil, errors.New("access not found")
 }
 
 func (s *TestingStorage) GetRefreshTokenData(ctx context.Context, token string) (*RefreshTokenData, error) {

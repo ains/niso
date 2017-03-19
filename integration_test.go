@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,7 @@ const (
 	clientID     = "test_client"
 	clientSecret = "notsecure"
 	redirectURI  = "http://localhost/callback"
+	testAuthCode = "9999"
 )
 
 type NisoIntegrationTestSuite struct {
@@ -33,14 +35,31 @@ func (s *NisoIntegrationTestSuite) SetupSuite() {
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
-		ar, err := server.GenerateAuthorizeRequest(ctx, r)
+
+		if ar, err := server.GenerateAuthorizeRequest(ctx, r); err != nil {
+			WriteErrorResponse(w, err)
+		} else {
+			ar.Authorized = true
+			resp, err := server.FinishAuthorizeRequest(ctx, ar)
+			if err != nil {
+				WriteErrorResponse(w, err)
+			} else {
+				WriteJSONResponse(w, resp)
+			}
+		}
+	}))
+	s.testAuthorizeURL = authServer.URL
+
+	accessServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.TODO()
+		ar, err := server.GenerateAccessRequest(ctx, r)
 		if err != nil {
 			WriteErrorResponse(w, err)
 			return
 		}
 
 		ar.Authorized = true
-		resp, err := server.FinishAuthorizeRequest(ctx, ar)
+		resp, err := server.FinishAccessRequest(ctx, ar)
 		if err != nil {
 			WriteErrorResponse(w, err)
 			return
@@ -48,7 +67,7 @@ func (s *NisoIntegrationTestSuite) SetupSuite() {
 
 		WriteJSONResponse(w, resp)
 	}))
-	s.testAuthorizeURL = authServer.URL
+	s.testAccessURL = accessServer.URL
 
 	s.oauthConfig = newOAuthConfig(s.testAuthorizeURL, s.testAccessURL)
 }
@@ -66,6 +85,19 @@ func (s *NisoIntegrationTestSuite) TestAuthCodeCallbackSuccess() {
 
 	assert.Equal(s.T(), 302, resp.StatusCode)
 	assert.Equal(s.T(), "http://localhost/callback?code=1&state=kappa", resp.Header["Location"][0])
+}
+
+func (s *NisoIntegrationTestSuite) TestAccessTokenExchangeSuccess() {
+	tok, err := s.oauthConfig.Exchange(context.TODO(), testAuthCode)
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), "r1", tok.RefreshToken)
+	assert.Equal(s.T(), "1", tok.AccessToken)
+}
+
+func (s *NisoIntegrationTestSuite) TestAccessTokenExchangeFail() {
+	_, err := s.oauthConfig.Exchange(context.TODO(), "invalid")
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "invalid_grant")
 }
 
 func TestNisoIntegrationTestSuite(t *testing.T) {
@@ -97,6 +129,14 @@ func newIntegrationTestStorage() Storage {
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		RedirectURI:  redirectURI,
+	}
+
+	r.authorize[testAuthCode] = &AuthorizeData{
+		ClientData:  r.clients[clientID],
+		Code:        testAuthCode,
+		ExpiresIn:   3600,
+		CreatedAt:   time.Now(),
+		RedirectURI: redirectURI,
 	}
 
 	return r

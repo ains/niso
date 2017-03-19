@@ -16,15 +16,9 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{AUTHORIZATION_CODE}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthURL, nil)
-	require.NoError(t, err)
-	req.SetBasicAuth("1234", "aabbccdd")
-
-	req.Form = make(url.Values)
-	req.Form.Set("grant_type", string(AUTHORIZATION_CODE))
+	req := makeTestRequest(t, AUTHORIZATION_CODE)
 	req.Form.Set("code", "9999")
 	req.Form.Set("state", "a")
-	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
@@ -43,15 +37,9 @@ func TestAccessRefreshToken(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{REFRESH_TOKEN}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthURL, nil)
-	require.NoError(t, err)
-	req.SetBasicAuth("1234", "aabbccdd")
-
-	req.Form = make(url.Values)
-	req.Form.Set("grant_type", string(REFRESH_TOKEN))
+	req := makeTestRequest(t, REFRESH_TOKEN)
 	req.Form.Set("refresh_token", "r9999")
 	req.Form.Set("state", "a")
-	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
@@ -70,16 +58,10 @@ func TestAccessPassword(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{PASSWORD}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthURL, nil)
-	require.NoError(t, err)
-	req.SetBasicAuth("1234", "aabbccdd")
-
-	req.Form = make(url.Values)
-	req.Form.Set("grant_type", string(PASSWORD))
+	req := makeTestRequest(t, PASSWORD)
 	req.Form.Set("username", "testing")
 	req.Form.Set("password", "testing")
 	req.Form.Set("state", "a")
-	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
@@ -98,15 +80,8 @@ func TestAccessClientCredentials(t *testing.T) {
 	config.AllowedAccessTypes = AllowedAccessTypes{CLIENT_CREDENTIALS}
 	server := newTestServer(config)
 
-	req, err := http.NewRequest("POST", testAuthURL, nil)
-	require.NoError(t, err)
-
-	req.SetBasicAuth("1234", "aabbccdd")
-
-	req.Form = make(url.Values)
-	req.Form.Set("grant_type", string(CLIENT_CREDENTIALS))
+	req := makeTestRequest(t, CLIENT_CREDENTIALS)
 	req.Form.Set("state", "a")
-	req.PostForm = make(url.Values)
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
@@ -179,16 +154,12 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 			CodeChallengeMethod: PKCECodeChallengeMethod(test.ChallengeMethod),
 		})
 
-		req, err := http.NewRequest("POST", testAuthURL, nil)
-		require.NoError(t, err)
+		req := makeTestRequest(t, AUTHORIZATION_CODE)
 		req.SetBasicAuth("public-client", "")
-
-		req.Form = make(url.Values)
 		req.Form.Set("grant_type", string(AUTHORIZATION_CODE))
 		req.Form.Set("code", "pkce-code")
 		req.Form.Set("state", "a")
 		req.Form.Set("code_verifier", test.Verifier)
-		req.PostForm = make(url.Values)
 
 		ar, err := server.GenerateAccessRequest(ctx, req)
 		if test.ExpectedError != "" {
@@ -207,4 +178,16 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 			assert.Equal(t, "r1", resp.Data["refresh_token"])
 		}
 	}
+}
+
+func makeTestRequest(t *testing.T, grantType GrantType) *http.Request {
+	req, err := http.NewRequest("POST", testAuthURL, nil)
+	require.NoError(t, err)
+
+	req.SetBasicAuth("1234", "aabbccdd")
+	req.Form = make(url.Values)
+	req.PostForm = make(url.Values)
+	req.Form.Set("grant_type", string(grantType))
+
+	return req
 }

@@ -11,7 +11,7 @@ type DefaultAuthorizeTokenGenerator struct {
 }
 
 // GenerateAuthorizeToken generates a base64-encoded UUID code
-func (a *DefaultAuthorizeTokenGenerator) GenerateAuthorizeToken(data *AuthorizeData) (string, error) {
+func (a *DefaultAuthorizeTokenGenerator) GenerateAuthorizeToken(data *AuthorizationRequest) (string, error) {
 	token := uuid.NewRandom()
 	return base64.RawURLEncoding.EncodeToString([]byte(token)), nil
 }

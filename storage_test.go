@@ -122,7 +122,7 @@ type TestingAuthorizeTokenGen struct {
 	counter int64
 }
 
-func (a *TestingAuthorizeTokenGen) GenerateAuthorizeToken(data *AuthorizeData) (ret string, err error) {
+func (a *TestingAuthorizeTokenGen) GenerateAuthorizeToken(data *AuthorizationRequest) (ret string, err error) {
 	a.counter++
 	return strconv.FormatInt(a.counter, 10), nil
 }

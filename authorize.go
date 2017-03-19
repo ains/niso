@@ -98,7 +98,7 @@ func (d *AuthorizeData) ExpireAt() time.Time {
 
 // AuthorizeTokenGenerator is the token generator interface
 type AuthorizeTokenGenerator interface {
-	GenerateAuthorizeToken(data *AuthorizeData) (string, error)
+	GenerateAuthorizeToken(data *AuthorizationRequest) (string, error)
 }
 
 // GenerateAuthorizeRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
@@ -258,7 +258,7 @@ func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 		}
 
 		// generate token code
-		code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ret)
+		code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ar)
 		if err != nil {
 			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to generate authorize token")
 

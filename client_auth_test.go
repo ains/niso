@@ -1,10 +1,11 @@
 package niso
 
 import (
-	"testing"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/assert"
 	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClientAuthFromRequestHeader(t *testing.T) {
@@ -19,9 +20,8 @@ func TestClientAuthFromRequestHeader(t *testing.T) {
 	assert.Equal(t, "aabbccdd", auth.Password)
 }
 
-
 func TestClientAuthFromRequestQueryParams(t *testing.T) {
-	req, err := http.NewRequest("POST", testAuthURL + "?client_id=1234&client_secret=aabbccdd", nil)
+	req, err := http.NewRequest("POST", testAuthURL+"?client_id=1234&client_secret=aabbccdd", nil)
 	require.NoError(t, err)
 
 	auth, err := getClientAuthFromRequest(req, true)
@@ -30,4 +30,3 @@ func TestClientAuthFromRequestQueryParams(t *testing.T) {
 	assert.Equal(t, "1234", auth.Username)
 	assert.Equal(t, "aabbccdd", auth.Password)
 }
-

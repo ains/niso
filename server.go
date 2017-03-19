@@ -1,6 +1,6 @@
 package niso
 
-import (
+import 	(
 	"time"
 )
 
@@ -16,10 +16,10 @@ type Server struct {
 // NewServer creates a new server instance
 func NewServer(config *ServerConfig, storage Storage) *Server {
 	return &Server{
-		Config:  config,
-		Storage: storage,
-		//AuthorizeTokenGenerator: &AuthorizeTokenGenDefault{},
-		//AccessTokenGenerator: &AccessTokenGenDefault{},
-		Now: time.Now,
+		Config:                  config,
+		Storage:                 storage,
+		AuthorizeTokenGenerator: &DefaultAuthorizeTokenGenerator{},
+		AccessTokenGenerator:    &DefaultAccessTokenGenerator{},
+		Now:                     time.Now,
 	}
 }

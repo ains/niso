@@ -64,7 +64,7 @@ func (s *TestingStorage) GetClientData(_ context.Context, id string) (*ClientDat
 	if c, ok := s.clients[id]; ok {
 		return c, nil
 	}
-	return nil, &NotFoundError{err: errors.New("client not found")}
+	return nil, &NotFoundError{Err: errors.New("client not found")}
 }
 
 func (s *TestingStorage) SetClient(id string, client *ClientData) error {

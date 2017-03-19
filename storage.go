@@ -38,9 +38,9 @@ type Storage interface {
 
 // NotFoundError can be used to differentiate between internal server errors and an entity not existing in storage.
 type NotFoundError struct {
-	err error
+	Err error
 }
 
 func (e *NotFoundError) Error() string {
-	return e.err.Error()
+	return e.Err.Error()
 }

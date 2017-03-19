@@ -103,16 +103,14 @@ type AuthorizeTokenGenerator interface {
 
 // GenerateAuthorizeRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
 func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
-	r.ParseForm()
-
-	reqRedirectURI, err := url.QueryUnescape(r.Form.Get("redirect_uri"))
-	reqState := r.Form.Get("state")
+	reqRedirectURI, err := url.QueryUnescape(r.FormValue("redirect_uri"))
+	reqState := r.FormValue("state")
 	if err != nil {
 		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "redirect_uri is not a valid url-encoded string")
 	}
 
 	// must have a valid client
-	clientData, err := getClientData(ctx, r.Form.Get("client_id"), s.Storage)
+	clientData, err := getClientData(ctx, r.FormValue("client_id"), s.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -128,11 +126,11 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	}
 
 	ar := &AuthorizationRequest{
-		State:               r.Form.Get("state"),
-		Scope:               r.Form.Get("scope"),
-		ResponseType:        AuthorizeResponseType(r.Form.Get("response_type")),
-		CodeChallenge:       r.Form.Get("code_challenge"),
-		CodeChallengeMethod: PKCECodeChallengeMethod(r.Form.Get("code_challenge_method")),
+		State:               r.FormValue("state"),
+		Scope:               r.FormValue("scope"),
+		ResponseType:        AuthorizeResponseType(r.FormValue("response_type")),
+		CodeChallenge:       r.FormValue("code_challenge"),
+		CodeChallengeMethod: PKCECodeChallengeMethod(r.FormValue("code_challenge_method")),
 		Authorized:          false,
 	}
 	ar.ClientData = clientData

@@ -126,12 +126,7 @@ func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*A
 		return nil, NewNisoError(E_INVALID_REQUEST, "access requests must POST verb")
 	}
 
-	err := r.ParseForm()
-	if err != nil {
-		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "failed to parse access request form body")
-	}
-
-	grantType := GrantType(r.Form.Get("grant_type"))
+	grantType := GrantType(r.FormValue("grant_type"))
 	if s.Config.AllowedAccessTypes.Exists(grantType) {
 		switch grantType {
 		case AUTHORIZATION_CODE:
@@ -158,8 +153,8 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	// generate access token
 	ret := &AccessRequest{
 		GrantType:       AUTHORIZATION_CODE,
-		Code:            r.Form.Get("code"),
-		CodeVerifier:    r.Form.Get("code_verifier"),
+		Code:            r.FormValue("code"),
+		CodeVerifier:    r.FormValue("code_verifier"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
 		HTTPRequest:     r,
@@ -257,8 +252,8 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	// generate access token
 	req := &AccessRequest{
 		GrantType:       REFRESH_TOKEN,
-		Code:            r.Form.Get("refresh_token"),
-		Scope:           r.Form.Get("scope"),
+		Code:            r.FormValue("refresh_token"),
+		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
 		HTTPRequest:     r,
@@ -311,9 +306,9 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 	// generate access token
 	ret := &AccessRequest{
 		GrantType:       PASSWORD,
-		Username:        r.Form.Get("username"),
-		Password:        r.Form.Get("password"),
-		Scope:           r.Form.Get("scope"),
+		Username:        r.FormValue("username"),
+		Password:        r.FormValue("password"),
+		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
 		HTTPRequest:     r,
@@ -350,7 +345,7 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 	// generate access token
 	ret := &AccessRequest{
 		GrantType:       CLIENT_CREDENTIALS,
-		Scope:           r.Form.Get("scope"),
+		Scope:           r.FormValue("scope"),
 		GenerateRefresh: false,
 		Expiration:      s.Config.AccessExpiration,
 		HTTPRequest:     r,

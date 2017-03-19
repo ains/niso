@@ -35,18 +35,20 @@ func (s *NisoIntegrationTestSuite) SetupSuite() {
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
-
-		if ar, err := server.GenerateAuthorizeRequest(ctx, r); err != nil {
+		ar, err := server.GenerateAuthorizeRequest(ctx, r)
+		if err != nil {
 			WriteErrorResponse(w, err)
-		} else {
-			ar.Authorized = true
-			resp, err := server.FinishAuthorizeRequest(ctx, ar)
-			if err != nil {
-				WriteErrorResponse(w, err)
-			} else {
-				WriteJSONResponse(w, resp)
-			}
+			return
 		}
+
+		ar.Authorized = true
+		resp, err := server.FinishAuthorizeRequest(ctx, ar)
+		if err != nil {
+			WriteErrorResponse(w, err)
+			return
+		}
+
+		WriteJSONResponse(w, resp)
 	}))
 	s.testAuthorizeURL = authServer.URL
 

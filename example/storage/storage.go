@@ -63,7 +63,6 @@ func (s *ExampleStorage) GetAuthorizeData(_ context.Context, code string) (*niso
 	return nil, errors.New("authorize not found")
 }
 
-
 // DeleteAuthorizeData revokes or deletes the authorization code.
 func (s *ExampleStorage) DeleteAuthorizeData(ctx context.Context, code string) error {
 	delete(s.authorize, code)

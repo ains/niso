@@ -11,18 +11,18 @@ type Storage interface {
 	// Should return NotFoundError, so an E_INVALID_CLIENT error will be returned instead of E_SERVER_ERROR
 	GetClientData(ctx context.Context, id string) (*ClientData, error)
 
-	// SaveAuthorize saves authorize data.
-	SaveAuthorizeData(ctx context.Context, data *AuthorizeData) error
-
 	// GetAuthorizeData looks up AuthorizeData by a code.
 	//// ClientData information MUST be loaded together.
 	// Optionally can return error if expired.
 	GetAuthorizeData(ctx context.Context, code string) (*AuthorizeData, error)
 
-	// RemoveAuthorize revokes or deletes the authorization code.
+	// SaveAuthorize saves authorize data.
+	SaveAuthorizeData(ctx context.Context, data *AuthorizeData) error
+
+	// DeleteAuthorizeData revokes or deletes the authorization code.
 	DeleteAuthorizeData(ctx context.Context, code string) error
 
-	// SaveAccess writes AccessData to storage.
+	// SaveAccessData writes AccessData to storage.
 	SaveAccessData(ctx context.Context, data *AccessData) error
 
 	// GetRefreshTokenData retrieves refresh token data from the token string.

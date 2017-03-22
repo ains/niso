@@ -67,11 +67,6 @@ func (s *TestingStorage) GetClientData(_ context.Context, id string) (*ClientDat
 	return nil, &NotFoundError{Err: errors.New("client not found")}
 }
 
-func (s *TestingStorage) SetClient(id string, client *ClientData) error {
-	s.clients[id] = client
-	return nil
-}
-
 func (s *TestingStorage) SaveAuthorizeData(_ context.Context, data *AuthorizeData) error {
 	s.authorize[data.Code] = data
 	return nil
@@ -108,11 +103,6 @@ func (s *TestingStorage) SaveRefreshTokenData(ctx context.Context, data *Refresh
 
 func (s *TestingStorage) DeleteRefreshTokenData(ctx context.Context, token string) error {
 	delete(s.refresh, token)
-	return nil
-}
-
-func (s *TestingStorage) RemoveAccess(code string) error {
-	delete(s.access, code)
 	return nil
 }
 

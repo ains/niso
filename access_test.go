@@ -23,7 +23,7 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
 	require.NoError(t, err)
-	ar.Authorized = true
+
 	resp, err := server.FinishAccessRequest(ctx, ar)
 	require.NoError(t, err)
 
@@ -44,7 +44,7 @@ func TestAccessRefreshToken(t *testing.T) {
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
 	require.NoError(t, err)
-	ar.Authorized = true
+
 	resp, err := server.FinishAccessRequest(ctx, ar)
 	require.NoError(t, err)
 
@@ -64,10 +64,13 @@ func TestAccessPassword(t *testing.T) {
 	req.Form.Set("state", "a")
 
 	ctx := context.TODO()
-	ar, err := server.GenerateAccessRequest(ctx, req)
-	require.NoError(t, err)
-	ar.Authorized = ar.Username == "testing" && ar.Password == "testing"
-	resp, err := server.FinishAccessRequest(ctx, ar)
+	resp, err := server.HandleAccessRequest(
+		ctx,
+		req,
+		func(ar *AccessRequest) (bool, error) {
+			return ar.Username == "testing" && ar.Password == "testing", nil
+		},
+	)
 	require.NoError(t, err)
 
 	assert.Equal(t, DATA, resp.responseType)
@@ -86,7 +89,7 @@ func TestAccessClientCredentials(t *testing.T) {
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
 	require.NoError(t, err)
-	ar.Authorized = true
+
 	resp, err := server.FinishAccessRequest(ctx, ar)
 	require.NoError(t, err)
 
@@ -169,7 +172,6 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		} else {
 			require.NoError(t, err)
 
-			ar.Authorized = true
 			resp, err := server.FinishAccessRequest(ctx, ar)
 			require.NoError(t, err)
 

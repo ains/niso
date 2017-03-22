@@ -21,6 +21,10 @@ const (
 	IMPLICIT           GrantType = "__implicit"
 )
 
+// AccessRequestAuthorizedCallback returns if an access request should succeed or access should be denied.
+// errors returned by this function will result in internal server errors being returned
+type AccessRequestAuthorizedCallback func(ar *AccessRequest) (bool, error)
+
 // AccessRequest is a request for access tokens
 type AccessRequest struct {
 	GrantType     GrantType
@@ -36,9 +40,6 @@ type AccessRequest struct {
 	Password      string
 	AssertionType string
 	Assertion     string
-
-	// Set if request is Authorized
-	Authorized bool
 
 	// Token expiration in seconds. Change if different from default
 	Expiration int32
@@ -117,7 +118,35 @@ type AccessTokenGenerator interface {
 	GenerateRefreshToken(ar *AccessRequest) (refreshToken string, err error)
 }
 
-// GenerateAccessRequest handles access token requests. Generates an AccessRequest from a HTTP request.
+// HandleAccessRequest is the main entry point for handling access requests.
+// This method will always return a Response, even if there was an error processing the request, which should be
+// rendered for a user. It may also return an error in the second argument which can be logged by the caller.
+func (s *Server) HandleAccessRequest(ctx context.Context, r *http.Request, isAuthorizedCb AccessRequestAuthorizedCallback) (*Response, error) {
+	ar, err := s.GenerateAccessRequest(ctx, r)
+	if err != nil {
+		return toNisoError(err).AsResponse(), err
+	}
+
+	isAuthorized, err := isAuthorizedCb(ar)
+	if err != nil {
+		err = NewWrappedNisoError(E_SERVER_ERROR, err, "authorization check failed")
+		return toNisoError(err).AsResponse(), err
+	}
+
+	if !isAuthorized {
+		err = NewNisoError(E_ACCESS_DENIED, "access denied")
+		return toNisoError(err).AsResponse(), err
+	}
+
+	resp, err := s.FinishAccessRequest(ctx, ar)
+	if err != nil {
+		return toNisoError(err).AsResponse(), err
+	}
+
+	return resp, nil
+}
+
+// GenerateAccessRequest generates an AccessRequest from a HTTP request.
 func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
 	// Only allow GET (when AllowGetAccessRequest set) or POST
 	if r.Method == "GET" && !s.Config.AllowGetAccessRequest {
@@ -373,73 +402,69 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		redirectURI = ar.RedirectURI
 	}
 
-	if ar.Authorized {
-		var ret *AccessData
-		var err error
+	var ret *AccessData
+	var err error
 
-		// generate access token
-		ret = &AccessData{
-			ClientData:  ar.ClientData,
-			RedirectURI: redirectURI,
-			CreatedAt:   s.Now(),
-			ExpiresIn:   ar.Expiration,
-			UserData:    ar.UserData,
-			Scope:       ar.Scope,
+	// generate access token
+	ret = &AccessData{
+		ClientData:  ar.ClientData,
+		RedirectURI: redirectURI,
+		CreatedAt:   s.Now(),
+		ExpiresIn:   ar.Expiration,
+		UserData:    ar.UserData,
+		Scope:       ar.Scope,
+	}
+
+	// generate access token
+	ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ar)
+	if err != nil {
+		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to generate access token")
+	}
+
+	if ar.GenerateRefresh {
+		// Generate Refresh Token
+		rt := &RefreshTokenData{
+			ClientID:  ar.ClientData.ClientID,
+			CreatedAt: s.Now(),
+			UserData:  ar.UserData,
+			Scope:     ar.Scope,
 		}
-
-		// generate access token
-		ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ar)
+		rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
 		if err != nil {
-			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to generate access token")
+			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to generate refresh token")
 		}
 
-		if ar.GenerateRefresh {
-			// Generate Refresh Token
-			rt := &RefreshTokenData{
-				ClientID:  ar.ClientData.ClientID,
-				CreatedAt: s.Now(),
-				UserData:  ar.UserData,
-				Scope:     ar.Scope,
-			}
-			rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
-			if err != nil {
-				return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to generate refresh token")
-			}
-
-			// Save Refresh Token
-			if err := s.Storage.SaveRefreshTokenData(ctx, rt); err != nil {
-				return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "could not save new refresh token data")
-			}
-
-			// Attach refresh token string to output
-			resp.Data["refresh_token"] = rt.RefreshToken
+		// Save Refresh Token
+		if err := s.Storage.SaveRefreshTokenData(ctx, rt); err != nil {
+			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "could not save new refresh token data")
 		}
 
-		// save access token
-		if err = s.Storage.SaveAccessData(ctx, ret); err != nil {
-			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to save access data")
-		}
+		// Attach refresh token string to output
+		resp.Data["refresh_token"] = rt.RefreshToken
+	}
 
-		// remove authorization token
-		if ar.AuthorizeData != nil {
-			s.Storage.DeleteAuthorizeData(ctx, ar.AuthorizeData.Code)
-		}
+	// save access token
+	if err = s.Storage.SaveAccessData(ctx, ret); err != nil {
+		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to save access data")
+	}
 
-		// remove previous access token
-		if ar.PreviousRefreshToken != nil {
-			s.Storage.DeleteRefreshTokenData(ctx, ar.PreviousRefreshToken.RefreshToken)
-		}
+	// remove authorization token
+	if ar.AuthorizeData != nil {
+		s.Storage.DeleteAuthorizeData(ctx, ar.AuthorizeData.Code)
+	}
 
-		// output data
-		resp.Data["access_token"] = ret.AccessToken
-		resp.Data["token_type"] = s.Config.TokenType
-		resp.Data["expires_in"] = ret.ExpiresIn
+	// remove previous access token
+	if ar.PreviousRefreshToken != nil {
+		s.Storage.DeleteRefreshTokenData(ctx, ar.PreviousRefreshToken.RefreshToken)
+	}
 
-		if ar.Scope != "" {
-			resp.Data["scope"] = ar.Scope
-		}
-	} else {
-		return nil, NewNisoError(E_ACCESS_DENIED, "access denied")
+	// output data
+	resp.Data["access_token"] = ret.AccessToken
+	resp.Data["token_type"] = s.Config.TokenType
+	resp.Data["expires_in"] = ret.ExpiresIn
+
+	if ar.Scope != "" {
+		resp.Data["scope"] = ar.Scope
 	}
 
 	return resp, nil

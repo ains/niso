@@ -47,6 +47,19 @@ func NewResponse() *Response {
 	return r
 }
 
+func newInternalServerErrorResponse(message string) *Response {
+	r := &Response{
+		responseType: DATA,
+		StatusCode:   http.StatusInternalServerError,
+		Data: map[string]interface{}{
+			"message": message,
+		},
+		Headers: make(http.Header),
+	}
+
+	return r
+}
+
 // SetRedirectURL changes the response to redirect to the given url
 func (r *Response) SetRedirectURL(url string) {
 	// set redirect parameters

@@ -21,40 +21,38 @@ server := niso.NewServer(niso.NewServerConfig(), storage.NewExampleStorage())
 
 // Authorization code endpoint
 http.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
-  ctx := context.TODO()
-  ar, err := server.GenerateAuthorizeRequest(ctx, r)
-  if err != nil {
-    niso.WriteErrorResponse(w, err)
-    return
-  }
+    ctx := context.TODO()
 
-  ar.Authorized = true
-  resp, err := server.FinishAuthorizeRequest(ctx, ar)
-  if err != nil {
-    niso.WriteErrorResponse(w, err)
-    return
-  }
+    resp, err := server.HandleAuthorizeRequest(
+        ctx,
+        r,
+        func(ar *niso.AuthorizationRequest) (bool, error) {
+            return true, nil
+        },
+    )
+    if err != nil {
+        log.Printf("Error handling authorize request %v", err)
+    }
 
-  niso.WriteJSONResponse(w, resp)
+    niso.WriteJSONResponse(w, resp)
 })
 
 // Access token endpoint
 http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
-  ctx := context.TODO()
-  ar, err := server.GenerateAccessRequest(ctx, r)
-  if err != nil {
-    niso.WriteErrorResponse(w, err)
-    return
-  }
+    ctx := context.TODO()
 
-  ar.Authorized = true
-  resp, err := server.FinishAccessRequest(ctx, ar)
-  if err != nil {
-    niso.WriteErrorResponse(w, err)
-    return
-  }
+    resp, err := server.HandleAccessRequest(
+        ctx,
+        r,
+        func(ar *niso.AccessRequest) (bool, error) {
+            return true, nil
+        },
+    )
+    if err != nil {
+        log.Printf("Error handling access request %v", err)
+    }
 
-  niso.WriteJSONResponse(w, resp)
+    niso.WriteJSONResponse(w, resp)
 })
 
 http.ListenAndServe(":14000", nil)

@@ -23,7 +23,6 @@ func TestAuthorizeCode(t *testing.T) {
 	ar, err := server.GenerateAuthorizeRequest(ctx, req)
 	require.NoError(t, err)
 
-	ar.Authorized = true
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
 	require.NoError(t, err)
 
@@ -39,11 +38,11 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 	req := makeAuthorizeTestRequest(t, CODE)
 
 	ctx := context.TODO()
-	ar, err := server.GenerateAuthorizeRequest(ctx, req)
-	require.NoError(t, err)
-
-	ar.Authorized = false
-	_, err = server.FinishAuthorizeRequest(ctx, ar)
+	resp, err := server.HandleAuthorizeRequest(
+		ctx,
+		req,
+		func(_ *AuthorizationRequest) (bool, error) { return false, nil },
+	)
 	assertNisoError(
 		t,
 		err,
@@ -54,6 +53,13 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 	redirectURI, err := err.(*NisoError).GetRedirectURI()
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:14000/appauth?error=access_denied&error_description=access+denied&state=a", redirectURI)
+
+	respRedirectURI, err := resp.GetRedirectURL()
+	require.NoError(t, err)
+
+	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
+	assert.Equal(t, "http://localhost:14000/appauth?error=access_denied&error_description=access+denied&state=a", respRedirectURI)
+
 }
 
 func TestAuthorizeInvalidClient(t *testing.T) {
@@ -128,7 +134,6 @@ func TestAuthorizeToken(t *testing.T) {
 	ar, err := server.GenerateAuthorizeRequest(ctx, req)
 	require.NoError(t, err)
 
-	ar.Authorized = true
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
 	require.NoError(t, err)
 
@@ -170,7 +175,6 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		ar, err := server.GenerateAuthorizeRequest(ctx, req)
 		require.NoError(t, err)
 
-		ar.Authorized = true
 		resp, err := server.FinishAuthorizeRequest(ctx, ar)
 		require.NoError(t, err)
 
@@ -193,7 +197,6 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	ar, err := server.GenerateAuthorizeRequest(ctx, req)
 	require.NoError(t, err)
 
-	ar.Authorized = true
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
 	require.NoError(t, err)
 
@@ -223,7 +226,6 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	ar, err := server.GenerateAuthorizeRequest(ctx, req)
 	require.NoError(t, err)
 
-	ar.Authorized = true
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
 	require.NoError(t, err)
 

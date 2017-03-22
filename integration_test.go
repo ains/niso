@@ -35,17 +35,14 @@ func (s *NisoIntegrationTestSuite) SetupSuite() {
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
-		ar, err := server.GenerateAuthorizeRequest(ctx, r)
-		if err != nil {
-			WriteErrorResponse(w, err)
-			return
-		}
 
-		ar.Authorized = true
-		resp, err := server.FinishAuthorizeRequest(ctx, ar)
+		resp, err := server.HandleAuthorizeRequest(
+			ctx,
+			r,
+			func(_ *AuthorizationRequest) (bool, error) { return true, nil },
+		)
 		if err != nil {
-			WriteErrorResponse(w, err)
-			return
+			s.T().Logf("Error handling authorize request %v", err)
 		}
 
 		WriteJSONResponse(w, resp)
@@ -54,17 +51,13 @@ func (s *NisoIntegrationTestSuite) SetupSuite() {
 
 	accessServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
-		ar, err := server.GenerateAccessRequest(ctx, r)
+		resp, err := server.HandleAccessRequest(
+			ctx,
+			r,
+			func(_ *AccessRequest) (bool, error) { return true, nil },
+		)
 		if err != nil {
-			WriteErrorResponse(w, err)
-			return
-		}
-
-		ar.Authorized = true
-		resp, err := server.FinishAccessRequest(ctx, ar)
-		if err != nil {
-			WriteErrorResponse(w, err)
-			return
+			s.T().Logf("Error handling authorize request %v", err)
 		}
 
 		WriteJSONResponse(w, resp)
@@ -87,6 +80,37 @@ func (s *NisoIntegrationTestSuite) TestAuthCodeCallbackSuccess() {
 
 	assert.Equal(s.T(), 302, resp.StatusCode)
 	assert.Equal(s.T(), "http://localhost/callback?code=1&state=kappa", resp.Header["Location"][0])
+}
+
+func (s *NisoIntegrationTestSuite) TestAuthCodeCallbackBadRedirectURI() {
+	client := http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	config := *s.oauthConfig
+	config.RedirectURL = "http://invalid.redirect.uri/"
+	authCodeURL := config.AuthCodeURL("kappa")
+
+	resp, err := client.Get(authCodeURL)
+	require.NoError(s.T(), err)
+
+	assert.Equal(s.T(), 400, resp.StatusCode)
+}
+
+func (s *NisoIntegrationTestSuite) TestAuthCodeCallbackBadResponseType() {
+	client := http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	authCodeURL := s.oauthConfig.AuthCodeURL("kappa", oauth2.SetAuthURLParam("response_type", "garbage"))
+
+	resp, err := client.Get(authCodeURL)
+	require.NoError(s.T(), err)
+
+	assert.Equal(s.T(), 302, resp.StatusCode)
+	assert.Equal(s.T(), "http://localhost/callback?error=unsupported_response_type&error_description=request+type+not+in+server+allowed+authorize+types&state=kappa", resp.Header["Location"][0])
 }
 
 func (s *NisoIntegrationTestSuite) TestAccessTokenExchangeSuccess() {

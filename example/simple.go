@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"github.com/ains/niso"
@@ -14,17 +15,16 @@ func main() {
 	// Authorization code endpoint
 	http.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
-		ar, err := server.GenerateAuthorizeRequest(ctx, r)
-		if err != nil {
-			niso.WriteErrorResponse(w, err)
-			return
-		}
 
-		ar.Authorized = true
-		resp, err := server.FinishAuthorizeRequest(ctx, ar)
+		resp, err := server.HandleAuthorizeRequest(
+			ctx,
+			r,
+			func(ar *niso.AuthorizationRequest) (bool, error) {
+				return true, nil
+			},
+		)
 		if err != nil {
-			niso.WriteErrorResponse(w, err)
-			return
+			log.Printf("Error handling authorize request %v", err)
 		}
 
 		niso.WriteJSONResponse(w, resp)
@@ -33,17 +33,16 @@ func main() {
 	// Access token endpoint
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
-		ar, err := server.GenerateAccessRequest(ctx, r)
-		if err != nil {
-			niso.WriteErrorResponse(w, err)
-			return
-		}
 
-		ar.Authorized = true
-		resp, err := server.FinishAccessRequest(ctx, ar)
+		resp, err := server.HandleAccessRequest(
+			ctx,
+			r,
+			func(ar *niso.AccessRequest) (bool, error) {
+				return true, nil
+			},
+		)
 		if err != nil {
-			niso.WriteErrorResponse(w, err)
-			return
+			log.Printf("Error handling access request %v", err)
 		}
 
 		niso.WriteJSONResponse(w, resp)

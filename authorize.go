@@ -30,6 +30,10 @@ var (
 	pkceMatcher = regexp.MustCompile("^[a-zA-Z0-9~._-]{43,128}$")
 )
 
+// AuthRequestAuthorizedCallback returns if an authorization request should succeed or access should be denied.
+// errors returned by this function will result in internal server errors being returned
+type AuthRequestAuthorizedCallback func(ar *AuthorizationRequest) (bool, error)
+
 // AuthorizationRequest represents an incoming authorization request
 type AuthorizationRequest struct {
 	ResponseType AuthorizeResponseType
@@ -49,9 +53,6 @@ type AuthorizationRequest struct {
 
 	// (optional) Data to be passed to storage. Not used by the library.
 	UserData interface{}
-
-	// Set if request is Authorized
-	Authorized bool
 }
 
 // AuthorizeData represents an issued authorization code
@@ -104,7 +105,6 @@ type AuthorizeTokenGenerator interface {
 // GenerateAuthorizeRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
 func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
 	reqRedirectURI, err := url.QueryUnescape(r.FormValue("redirect_uri"))
-	reqState := r.FormValue("state")
 	if err != nil {
 		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "redirect_uri is not a valid url-encoded string")
 	}
@@ -131,27 +131,56 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 		ResponseType:        AuthorizeResponseType(r.FormValue("response_type")),
 		CodeChallenge:       r.FormValue("code_challenge"),
 		CodeChallengeMethod: PKCECodeChallengeMethod(r.FormValue("code_challenge_method")),
-		Authorized:          false,
 	}
 	ar.ClientData = clientData
 	ar.RedirectURI = reqRedirectURI
 
 	ret, err := s.generateAuthorizeRequest(ctx, ar)
 	if err != nil {
-		// errors caused by invalid client identifiers or redirect URIs will not cause redirects
-		// if an error occurs post redirect uri validation, redirect
-		// (https://tools.ietf.org/html/rfc6749#section-4.1.2.1)
-		if nisoErr, ok := err.(*NisoError); ok {
-			nisoErr.SetRedirectURI(reqRedirectURI)
-			nisoErr.SetState(reqState)
-
-			return nil, nisoErr
-		}
-
-		return nil, err
+		return nil, errorWithRedirect(ar, err)
 	}
 
 	return ret, nil
+}
+
+// errors caused by invalid client identifiers or redirect URIs will not cause redirects
+// if an error occurs post redirect uri validation, redirect with error in query
+// (https://tools.ietf.org/html/rfc6749#section-4.1.2.1)
+func errorWithRedirect(ar *AuthorizationRequest, err error) error {
+	nisoErr := toNisoError(err)
+
+	nisoErr.SetRedirectURI(ar.RedirectURI)
+	nisoErr.SetState(ar.State)
+
+	return nisoErr
+}
+
+// HandleAuthorizeRequest is the main entry point for handling authorization requests.
+// This method will always return a Response, even if there was an error processing the request, which should be
+// rendered for a user. It may also return an error in the second argument which can be logged by the caller.
+func (s *Server) HandleAuthorizeRequest(ctx context.Context, r *http.Request, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
+	ar, err := s.GenerateAuthorizeRequest(ctx, r)
+	if err != nil {
+		return toNisoError(err).AsResponse(), err
+	}
+
+	isAuthorized, err := isAuthorizedCb(ar)
+	if err != nil {
+		err = NewWrappedNisoError(E_SERVER_ERROR, err, "authorization check failed")
+		return toNisoError(err).AsResponse(), err
+	}
+
+	if !isAuthorized {
+		err = errorWithRedirect(ar, NewNisoError(E_ACCESS_DENIED, "access denied"))
+		return toNisoError(err).AsResponse(), err
+	}
+
+	resp, err := s.FinishAuthorizeRequest(ctx, ar)
+	if err != nil {
+		return toNisoError(err).AsResponse(), err
+	}
+
+	return resp, nil
 }
 
 func (s *Server) generateAuthorizeRequest(ctx context.Context, ret *AuthorizationRequest) (*AuthorizationRequest, error) {
@@ -196,84 +225,71 @@ func (s *Server) generateAuthorizeRequest(ctx context.Context, ret *Authorizatio
 func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
 	resp, err := s.finishAuthorizeRequest(ctx, ar)
 	if err != nil {
-		if nisoErr, ok := err.(*NisoError); ok {
-			nisoErr.SetRedirectURI(ar.RedirectURI)
-			nisoErr.SetState(ar.State)
-
-			return nil, nisoErr
-		}
-
-		return nil, err
+		return nil, errorWithRedirect(ar, err)
 	}
 
 	return resp, nil
 }
 
 func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
-	if ar.Authorized {
-		if ar.ResponseType == TOKEN {
-			// generate token directly
-			ret := &AccessRequest{
-				GrantType:       IMPLICIT,
-				Code:            "",
-				ClientData:      ar.ClientData,
-				RedirectURI:     ar.RedirectURI,
-				Scope:           ar.Scope,
-				GenerateRefresh: false, // per the RFC, should NOT generate a refresh token in this case
-				Authorized:      true,
-				Expiration:      ar.Expiration,
-				UserData:        ar.UserData,
-			}
-
-			resp, err := s.FinishAccessRequest(ctx, ret)
-			if err != nil {
-				return nil, err
-			}
-
-			resp.SetRedirectURL(ar.RedirectURI)
-			resp.SetRedirectFragment(true)
-			if ar.State != "" {
-				resp.Data["state"] = ar.State
-			}
-			return resp, nil
+	if ar.ResponseType == TOKEN {
+		// generate token directly
+		ret := &AccessRequest{
+			GrantType:       IMPLICIT,
+			Code:            "",
+			ClientData:      ar.ClientData,
+			RedirectURI:     ar.RedirectURI,
+			Scope:           ar.Scope,
+			GenerateRefresh: false, // per the RFC, should NOT generate a refresh token in this case
+			Expiration:      ar.Expiration,
+			UserData:        ar.UserData,
 		}
 
-		resp := NewResponse()
-		resp.SetRedirectURL(ar.RedirectURI)
-
-		// generate authorization token
-		ret := &AuthorizeData{
-			ClientData:  ar.ClientData,
-			CreatedAt:   s.Now(),
-			ExpiresIn:   ar.Expiration,
-			RedirectURI: ar.RedirectURI,
-			State:       ar.State,
-			Scope:       ar.Scope,
-			UserData:    ar.UserData,
-			// Optional PKCE challenge
-			CodeChallenge:       ar.CodeChallenge,
-			CodeChallengeMethod: ar.CodeChallengeMethod,
-		}
-
-		// generate token code
-		code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ar)
+		resp, err := s.FinishAccessRequest(ctx, ret)
 		if err != nil {
-			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to generate authorize token")
-
-		}
-		ret.Code = code
-
-		// save authorization token
-		if err = s.Storage.SaveAuthorizeData(ctx, ret); err != nil {
-			return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to save authorize data")
+			return nil, err
 		}
 
-		// redirect with code
-		resp.Data["code"] = ret.Code
-		resp.Data["state"] = ret.State
+		resp.SetRedirectURL(ar.RedirectURI)
+		resp.SetRedirectFragment(true)
+		if ar.State != "" {
+			resp.Data["state"] = ar.State
+		}
 		return resp, nil
 	}
 
-	// redirect with error
-	return nil, NewNisoError(E_ACCESS_DENIED, "access denied")
+	resp := NewResponse()
+	resp.SetRedirectURL(ar.RedirectURI)
+
+	// generate authorization token
+	ret := &AuthorizeData{
+		ClientData:  ar.ClientData,
+		CreatedAt:   s.Now(),
+		ExpiresIn:   ar.Expiration,
+		RedirectURI: ar.RedirectURI,
+		State:       ar.State,
+		Scope:       ar.Scope,
+		UserData:    ar.UserData,
+		// Optional PKCE challenge
+		CodeChallenge:       ar.CodeChallenge,
+		CodeChallengeMethod: ar.CodeChallengeMethod,
+	}
+
+	// generate token code
+	code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ar)
+	if err != nil {
+		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to generate authorize token")
+
+	}
+	ret.Code = code
+
+	// save authorization token
+	if err = s.Storage.SaveAuthorizeData(ctx, ret); err != nil {
+		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to save authorize data")
+	}
+
+	// redirect with code
+	resp.Data["code"] = ret.Code
+	resp.Data["state"] = ret.State
+	return resp, nil
 }

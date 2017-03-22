@@ -73,6 +73,33 @@ func (e *NisoError) Error() string {
 	return fmt.Sprintf("(%s) %s", e.Code, e.Err.Error())
 }
 
+// AsResponse creates a response object from this error, containing it's body or a redirect if specified
+func (e *NisoError) AsResponse() *Response {
+	resp := NewResponse()
+
+	// Redirect user if needed
+	loc, err := e.GetRedirectURI()
+	if err != nil {
+		return newInternalServerErrorResponse(
+			errors.Wrap(err, "failed to redirect on error").Error(),
+		)
+	}
+	if loc != "" {
+		resp.responseType = REDIRECT
+		resp.redirectURL = loc
+	}
+
+	// No redirect output error as a JSON response
+	resp.StatusCode = statusCodeForError(e)
+	for k, v := range e.GetResponseDict() {
+		if v != "" {
+			resp.Data[k] = v
+		}
+	}
+
+	return resp
+}
+
 // GetRedirectURI returns location to redirect user to after processing this error, or empty string if there is none
 func (e *NisoError) GetRedirectURI() (string, error) {
 	if e.redirectURI == "" {
@@ -103,4 +130,25 @@ func (e *NisoError) GetResponseDict() map[string]string {
 		"error_description": e.Message,
 		"state":             e.state,
 	}
+}
+
+func toNisoError(err error) *NisoError {
+	if ne, ok := err.(*NisoError); ok {
+		return ne
+	}
+
+	return NewWrappedNisoError(E_SERVER_ERROR, err, "unknown error")
+}
+
+// status code to return for a given error code as per (https://tools.ietf.org/html/rfc6749#section-5.2)
+func statusCodeForError(error *NisoError) int {
+	if error.Code == E_SERVER_ERROR {
+		return 500
+	} else if error.Code == E_TEMPORARILY_UNAVAILABLE {
+		return 503
+	} else if error.Code == E_INVALID_CLIENT || error.Code == E_ACCESS_DENIED {
+		return 401
+	}
+
+	return 400
 }

@@ -47,7 +47,7 @@ func (s *ExampleStorage) GetClientData(_ context.Context, id string) (*niso.Clie
 	return nil, &niso.NotFoundError{Err: errors.New("client not found")}
 }
 
-// SaveAuthorize saves authorize data.
+// SaveAuthorizeData saves authorize data.
 func (s *ExampleStorage) SaveAuthorizeData(_ context.Context, data *niso.AuthorizeData) error {
 	s.authorize[data.Code] = data
 	return nil

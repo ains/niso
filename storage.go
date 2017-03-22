@@ -16,7 +16,7 @@ type Storage interface {
 	// Optionally can return error if expired.
 	GetAuthorizeData(ctx context.Context, code string) (*AuthorizeData, error)
 
-	// SaveAuthorize saves authorize data.
+	// SaveAuthorizeData saves authorize data.
 	SaveAuthorizeData(ctx context.Context, data *AuthorizeData) error
 
 	// DeleteAuthorizeData revokes or deletes the authorization code.

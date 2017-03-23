@@ -34,7 +34,7 @@ func NewTestingStorage() *TestingStorage {
 	}
 
 	r.authorize["9999"] = &AuthorizeData{
-		ClientData:  r.clients["1234"],
+		ClientID:    "1234",
 		Code:        "9999",
 		ExpiresIn:   3600,
 		CreatedAt:   time.Now(),
@@ -42,7 +42,7 @@ func NewTestingStorage() *TestingStorage {
 	}
 
 	r.access["9999"] = &AccessData{
-		ClientData:  r.clients["1234"],
+		ClientID:    "1234",
 		AccessToken: "9999",
 		ExpiresIn:   3600,
 		CreatedAt:   time.Now(),

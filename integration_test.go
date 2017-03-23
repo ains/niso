@@ -158,7 +158,7 @@ func newIntegrationTestStorage() Storage {
 	}
 
 	r.authorize[testAuthCode] = &AuthorizeData{
-		ClientData:  r.clients[clientID],
+		ClientID:    clientID,
 		Code:        testAuthCode,
 		ExpiresIn:   3600,
 		CreatedAt:   time.Now(),

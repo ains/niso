@@ -143,12 +143,11 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 	ctx := context.TODO()
 
 	for _, test := range testcases {
-		testStorage := NewTestingStorage()
 		config := NewServerConfig()
 		config.AllowedAccessTypes = AllowedAccessTypes{AUTHORIZATION_CODE}
 		server := newTestServer(config)
 		server.Storage.SaveAuthorizeData(ctx, &AuthorizeData{
-			ClientData:          testStorage.clients["public-client"],
+			ClientID:            "public-client",
 			Code:                "pkce-code",
 			ExpiresIn:           3600,
 			CreatedAt:           time.Now(),

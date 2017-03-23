@@ -29,7 +29,7 @@ type AccessRequestAuthorizedCallback func(ar *AccessRequest) (bool, error)
 type AccessRequest struct {
 	GrantType     GrantType
 	Code          string
-	ClientData    *ClientData
+	ClientID      string
 	AuthorizeData *AuthorizeData
 
 	PreviousRefreshToken *RefreshTokenData
@@ -60,7 +60,7 @@ type AccessRequest struct {
 // AccessData represents an access grant (tokens, expiration, client, etc)
 type AccessData struct {
 	// ClientData information
-	ClientData *ClientData
+	ClientID string
 
 	// Access token
 	AccessToken string
@@ -181,6 +181,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 
 	// generate access token
 	ret := &AccessRequest{
+		ClientID:        auth.Username,
 		GrantType:       AUTHORIZATION_CODE,
 		Code:            r.FormValue("code"),
 		CodeVerifier:    r.FormValue("code_verifier"),
@@ -194,13 +195,6 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 		return nil, NewNisoError(E_INVALID_GRANT, "no authorization code provided")
 	}
 
-	// must have a valid client
-	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
-	if err != nil {
-		return nil, err
-	}
-	ret.ClientData = clientData
-
 	// must be a valid authorization code
 	ret.AuthorizeData, err = s.Storage.GetAuthorizeData(ctx, ret.Code)
 	if err != nil {
@@ -208,7 +202,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	}
 
 	// authorization code must be from the client id of current request
-	if ret.AuthorizeData.ClientData.ClientID != ret.ClientData.ClientID {
+	if ret.AuthorizeData.ClientID != ret.ClientID {
 		return nil, NewNisoError(E_INVALID_GRANT, "invalid client id for authorization code")
 	}
 
@@ -280,6 +274,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 
 	// generate access token
 	req := &AccessRequest{
+		ClientID:        auth.Username,
 		GrantType:       REFRESH_TOKEN,
 		Code:            r.FormValue("refresh_token"),
 		Scope:           r.FormValue("scope"),
@@ -293,13 +288,6 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 		return nil, NewNisoError(E_INVALID_GRANT, "no refresh token provided")
 	}
 
-	// must have a valid client
-	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
-	if err != nil {
-		return nil, err
-	}
-	req.ClientData = clientData
-
 	// must be a valid refresh code
 	req.PreviousRefreshToken, err = s.Storage.GetRefreshTokenData(ctx, req.Code)
 	if err != nil {
@@ -307,7 +295,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	// client must be the same as the previous token
-	if req.PreviousRefreshToken.ClientID != req.ClientData.ClientID {
+	if req.PreviousRefreshToken.ClientID != req.ClientID {
 		return nil, NewNisoError(E_INVALID_CLIENT, "request client id must be the same from previous token")
 	}
 
@@ -334,6 +322,7 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 
 	// generate access token
 	ret := &AccessRequest{
+		ClientID:        auth.Username,
 		GrantType:       PASSWORD,
 		Username:        r.FormValue("username"),
 		Password:        r.FormValue("password"),
@@ -356,10 +345,9 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 	if err != nil {
 		return nil, err
 	}
-	ret.ClientData = clientData
 
 	// set redirect uri
-	ret.RedirectURI = firstURI(ret.ClientData.RedirectURI, s.Config.RedirectURISeparator)
+	ret.RedirectURI = firstURI(clientData.RedirectURI, s.Config.RedirectURISeparator)
 
 	return ret, nil
 }
@@ -373,6 +361,7 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 
 	// generate access token
 	ret := &AccessRequest{
+		ClientID:        auth.Username,
 		GrantType:       CLIENT_CREDENTIALS,
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: false,
@@ -384,10 +373,9 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 	if err != nil {
 		return nil, err
 	}
-	ret.ClientData = clientData
 
 	// set redirect uri
-	ret.RedirectURI = firstURI(ret.ClientData.RedirectURI, s.Config.RedirectURISeparator)
+	ret.RedirectURI = firstURI(clientData.RedirectURI, s.Config.RedirectURISeparator)
 
 	return ret, nil
 }
@@ -407,7 +395,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 
 	// generate access token
 	ret = &AccessData{
-		ClientData:  ar.ClientData,
+		ClientID:    ar.ClientID,
 		RedirectURI: redirectURI,
 		CreatedAt:   s.Now(),
 		ExpiresIn:   ar.Expiration,
@@ -424,7 +412,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	if ar.GenerateRefresh {
 		// Generate Refresh Token
 		rt := &RefreshTokenData{
-			ClientID:  ar.ClientData.ClientID,
+			ClientID:  ar.ClientID,
 			CreatedAt: s.Now(),
 			UserData:  ar.UserData,
 			Scope:     ar.Scope,

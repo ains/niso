@@ -37,7 +37,7 @@ type AuthRequestAuthorizedCallback func(ar *AuthorizationRequest) (bool, error)
 // AuthorizationRequest represents an incoming authorization request
 type AuthorizationRequest struct {
 	ResponseType AuthorizeResponseType
-	ClientData   *ClientData
+	ClientID     string
 	Scope        string
 	RedirectURI  string
 	State        string
@@ -58,7 +58,7 @@ type AuthorizationRequest struct {
 // AuthorizeData represents an issued authorization code
 type AuthorizeData struct {
 	// ClientData information
-	ClientData *ClientData
+	ClientID string
 
 	// Authorization code
 	Code string
@@ -126,16 +126,16 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 	}
 
 	ar := &AuthorizationRequest{
+		ClientID:            clientData.ClientID,
 		State:               r.FormValue("state"),
 		Scope:               r.FormValue("scope"),
 		ResponseType:        AuthorizeResponseType(r.FormValue("response_type")),
 		CodeChallenge:       r.FormValue("code_challenge"),
 		CodeChallengeMethod: PKCECodeChallengeMethod(r.FormValue("code_challenge_method")),
 	}
-	ar.ClientData = clientData
 	ar.RedirectURI = reqRedirectURI
 
-	ret, err := s.generateAuthorizeRequest(ctx, ar)
+	ret, err := s.generateAuthorizeRequest(ctx, ar, clientData)
 	if err != nil {
 		return nil, errorWithRedirect(ar, err)
 	}
@@ -183,14 +183,14 @@ func (s *Server) HandleAuthorizeRequest(ctx context.Context, r *http.Request, is
 	return resp, nil
 }
 
-func (s *Server) generateAuthorizeRequest(ctx context.Context, ret *AuthorizationRequest) (*AuthorizationRequest, error) {
+func (s *Server) generateAuthorizeRequest(ctx context.Context, ret *AuthorizationRequest, clientData *ClientData) (*AuthorizationRequest, error) {
 	if s.Config.AllowedAuthorizeTypes.Exists(ret.ResponseType) {
 		ret.Expiration = s.Config.AuthorizationExpiration
 
 		if ret.ResponseType == CODE {
 			// Optional PKCE support (https://tools.ietf.org/html/rfc7636)
 			if codeChallenge := ret.CodeChallenge; len(codeChallenge) == 0 {
-				if s.Config.RequirePKCEForPublicClients && ret.ClientData.ClientSecret == "" {
+				if s.Config.RequirePKCEForPublicClients && clientData.ClientSecret == "" {
 					// https://tools.ietf.org/html/rfc7636#section-4.4.1
 					return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge (rfc7636) required for public clients")
 				}
@@ -237,7 +237,7 @@ func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 		ret := &AccessRequest{
 			GrantType:       IMPLICIT,
 			Code:            "",
-			ClientData:      ar.ClientData,
+			ClientID:        ar.ClientID,
 			RedirectURI:     ar.RedirectURI,
 			Scope:           ar.Scope,
 			GenerateRefresh: false, // per the RFC, should NOT generate a refresh token in this case
@@ -263,7 +263,7 @@ func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 
 	// generate authorization token
 	ret := &AuthorizeData{
-		ClientData:  ar.ClientData,
+		ClientID:    ar.ClientID,
 		CreatedAt:   s.Now(),
 		ExpiresIn:   ar.Expiration,
 		RedirectURI: ar.RedirectURI,

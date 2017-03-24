@@ -42,19 +42,19 @@ type NisoError struct {
 }
 
 // NewNisoError creates a new NisoError for a response error code
-func NewNisoError(code ErrorCode, message string) *NisoError {
+func NewNisoError(code ErrorCode, message string, args ...interface{}) *NisoError {
 	return &NisoError{
 		Code:    code,
-		Err:     errors.New(message),
+		Err:     errors.Errorf(message, args...),
 		Message: message,
 	}
 }
 
 // NewWrappedNisoError creates a new NisoError for a response error code and wraps the original error with the given description
-func NewWrappedNisoError(code ErrorCode, error error, message string) *NisoError {
+func NewWrappedNisoError(code ErrorCode, error error, message string, args ...interface{}) *NisoError {
 	return &NisoError{
 		Code:    code,
-		Err:     errors.Wrap(error, message),
+		Err:     errors.Wrapf(error, message, args...),
 		Message: message,
 	}
 }

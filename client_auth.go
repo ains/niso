@@ -28,7 +28,7 @@ func getClientAuthFromRequest(r *http.Request, allowQueryParams bool) (*BasicAut
 
 	user, pass, ok := r.BasicAuth()
 	if !ok {
-		return nil, errors.New("Invalid authorization header")
+		return nil, errors.New("invalid authorization header")
 	}
 
 	return &BasicAuth{

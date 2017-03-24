@@ -278,14 +278,14 @@ func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 	// generate token code
 	code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ar)
 	if err != nil {
-		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to generate authorize token")
+		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to generate authorize token")
 
 	}
 	ret.Code = code
 
 	// save authorization token
 	if err = s.Storage.SaveAuthorizeData(ctx, ret); err != nil {
-		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "Failed to save authorize data")
+		return nil, NewWrappedNisoError(E_SERVER_ERROR, err, "failed to save authorize data")
 	}
 
 	// redirect with code

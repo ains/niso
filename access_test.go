@@ -64,7 +64,7 @@ func TestAccessPassword(t *testing.T) {
 	req.Form.Set("state", "a")
 
 	ctx := context.TODO()
-	resp, err := server.HandleAccessRequest(
+	resp, err := server.HandleHTTPAccessRequest(
 		ctx,
 		req,
 		func(ar *AccessRequest) (bool, error) {

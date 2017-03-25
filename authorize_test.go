@@ -20,7 +20,9 @@ func TestAuthorizeCode(t *testing.T) {
 	req := makeAuthorizeTestRequest(t, CODE)
 
 	ctx := context.TODO()
-	ar, err := server.GenerateAuthorizeRequest(ctx, req)
+	ar, err := server.GenerateAuthorizationRequest(ctx, req)
+	require.NoError(t, err)
+
 	require.NoError(t, err)
 
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
@@ -38,7 +40,7 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 	req := makeAuthorizeTestRequest(t, CODE)
 
 	ctx := context.TODO()
-	resp, err := server.HandleAuthorizeRequest(
+	resp, err := server.HandleHTTPAuthorizeRequest(
 		ctx,
 		req,
 		func(_ *AuthorizationRequest) (bool, error) { return false, nil },
@@ -71,7 +73,8 @@ func TestAuthorizeInvalidClient(t *testing.T) {
 	req.Form.Set("client_id", "invalid")
 
 	ctx := context.TODO()
-	_, err := server.GenerateAuthorizeRequest(ctx, req)
+	_, err := server.GenerateAuthorizationRequest(ctx, req)
+
 	assertNisoError(
 		t,
 		err,
@@ -93,7 +96,8 @@ func TestAuthorizeInvalidRedirectURI(t *testing.T) {
 	req.Form.Set("redirect_uri", "invalid")
 
 	ctx := context.TODO()
-	_, err := server.GenerateAuthorizeRequest(ctx, req)
+	_, err := server.GenerateAuthorizationRequest(ctx, req)
+
 	assertNisoError(
 		t,
 		err,
@@ -114,7 +118,8 @@ func TestAuthorizeInvalidAuthorizeType(t *testing.T) {
 	req := makeAuthorizeTestRequest(t, CODE)
 
 	ctx := context.TODO()
-	_, err := server.GenerateAuthorizeRequest(ctx, req)
+	_, err := server.GenerateAuthorizationRequest(ctx, req)
+
 	assertNisoError(
 		t,
 		err,
@@ -131,7 +136,9 @@ func TestAuthorizeToken(t *testing.T) {
 	req := makeAuthorizeTestRequest(t, TOKEN)
 
 	ctx := context.TODO()
-	ar, err := server.GenerateAuthorizeRequest(ctx, req)
+	ar, err := server.GenerateAuthorizationRequest(ctx, req)
+	require.NoError(t, err)
+
 	require.NoError(t, err)
 
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
@@ -158,7 +165,8 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		req.Form.Set("client_id", "public-client")
 
 		ctx := context.TODO()
-		_, err = server.GenerateAuthorizeRequest(ctx, req)
+		_, err = server.GenerateAuthorizationRequest(ctx, req)
+
 		assertNisoError(
 			t,
 			err,
@@ -172,7 +180,9 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		req := makeAuthorizeTestRequest(t, CODE)
 
 		ctx := context.TODO()
-		ar, err := server.GenerateAuthorizeRequest(ctx, req)
+		ar, err := server.GenerateAuthorizationRequest(ctx, req)
+		require.NoError(t, err)
+
 		require.NoError(t, err)
 
 		resp, err := server.FinishAuthorizeRequest(ctx, ar)
@@ -194,7 +204,9 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	req.Form.Set("code_challenge", challenge)
 
 	ctx := context.TODO()
-	ar, err := server.GenerateAuthorizeRequest(ctx, req)
+	ar, err := server.GenerateAuthorizationRequest(ctx, req)
+	require.NoError(t, err)
+
 	require.NoError(t, err)
 
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
@@ -223,7 +235,9 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	req.Form.Set("code_challenge_method", "S256")
 
 	ctx := context.TODO()
-	ar, err := server.GenerateAuthorizeRequest(ctx, req)
+	ar, err := server.GenerateAuthorizationRequest(ctx, req)
+	require.NoError(t, err)
+
 	require.NoError(t, err)
 
 	resp, err := server.FinishAuthorizeRequest(ctx, ar)
@@ -252,7 +266,8 @@ func TestAuthorizeCodeInvalidChallengeMethod(t *testing.T) {
 	req.Form.Set("code_challenge_method", "invalid")
 
 	ctx := context.TODO()
-	_, err := server.GenerateAuthorizeRequest(ctx, req)
+	_, err := server.GenerateAuthorizationRequest(ctx, req)
+
 	assertNisoError(
 		t,
 		err,

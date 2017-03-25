@@ -3,7 +3,6 @@ package niso
 import (
 	"context"
 	"net/http"
-	"net/url"
 	"regexp"
 	"time"
 )
@@ -102,17 +101,48 @@ type AuthorizeTokenGenerator interface {
 	GenerateAuthorizeToken(data *AuthorizationRequest) (string, error)
 }
 
-// GenerateAuthorizeRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
-func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
-	reqRedirectURI, err := url.QueryUnescape(r.FormValue("redirect_uri"))
-	if err != nil {
-		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "redirect_uri is not a valid url-encoded string")
-	}
+// GenerateAuthorizationRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
+func (s *Server) GenerateAuthorizationRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
+	clientID := r.FormValue("client_id")
 
 	// must have a valid client
-	clientData, err := getClientData(ctx, r.FormValue("client_id"), s.Storage)
+	clientData, err := getClientData(ctx, clientID, s.Storage)
 	if err != nil {
 		return nil, err
+	}
+
+	// if there are multiple client redirect uri's don't set the uri
+	redirectURI := r.FormValue("redirect_uri")
+	clientRedirectURI := clientData.RedirectURI
+	URISeparator := s.Config.RedirectURISeparator
+	if redirectURI == "" && firstURI(clientRedirectURI, URISeparator) == clientRedirectURI {
+		redirectURI = firstURI(clientRedirectURI, URISeparator)
+	}
+
+	ar := &AuthorizationRequest{
+		ClientID:            clientID,
+		RedirectURI:         redirectURI,
+		State:               r.FormValue("state"),
+		Scope:               r.FormValue("scope"),
+		ResponseType:        AuthorizeResponseType(r.FormValue("response_type")),
+		CodeChallenge:       r.FormValue("code_challenge"),
+		CodeChallengeMethod: PKCECodeChallengeMethod(r.FormValue("code_challenge_method")),
+	}
+
+	if err := s.validateAuthorizationRequest(ctx, ar); err != nil {
+		return nil, err
+	}
+
+	return ar, nil
+}
+
+func (s *Server) validateAuthorizationRequest(ctx context.Context, ar *AuthorizationRequest) error {
+	// Validate redirect uri - invalid redirect URI's do not produce redirecting errors.
+	reqRedirectURI := ar.RedirectURI
+	// must have a valid client
+	clientData, err := getClientData(ctx, ar.ClientID, s.Storage)
+	if err != nil {
+		return err
 	}
 
 	// check redirect uri, if there are multiple client redirect uri's don't set the uri
@@ -122,25 +152,46 @@ func (s *Server) GenerateAuthorizeRequest(ctx context.Context, r *http.Request) 
 		reqRedirectURI = firstURI(clientRedirectURI, URISeparator)
 	}
 	if err = validateURIList(clientRedirectURI, reqRedirectURI, URISeparator); err != nil {
-		return nil, NewWrappedNisoError(E_INVALID_REQUEST, err, "specified redirect_uri not valid for the given client_id")
+		return NewWrappedNisoError(E_INVALID_REQUEST, err, "specified redirect_uri not valid for the given client_id")
 	}
 
-	ar := &AuthorizationRequest{
-		ClientID:            clientData.ClientID,
-		State:               r.FormValue("state"),
-		Scope:               r.FormValue("scope"),
-		ResponseType:        AuthorizeResponseType(r.FormValue("response_type")),
-		CodeChallenge:       r.FormValue("code_challenge"),
-		CodeChallengeMethod: PKCECodeChallengeMethod(r.FormValue("code_challenge_method")),
-	}
-	ar.RedirectURI = reqRedirectURI
+	// Redirect uri is valid, all future errors will redirect to redirectURI
+	if s.Config.AllowedAuthorizeTypes.Exists(ar.ResponseType) {
+		ar.Expiration = s.Config.AuthorizationExpiration
 
-	ret, err := s.generateAuthorizeRequest(ctx, ar, clientData)
-	if err != nil {
-		return nil, errorWithRedirect(ar, err)
+		if ar.ResponseType == CODE {
+			// Optional PKCE support (https://tools.ietf.org/html/rfc7636)
+			if codeChallenge := ar.CodeChallenge; len(codeChallenge) == 0 {
+				if s.Config.RequirePKCEForPublicClients && clientData.ClientSecret == "" {
+					// https://tools.ietf.org/html/rfc7636#section-4.4.1
+					return errorWithRedirect(ar, NewNisoError(E_INVALID_REQUEST, "code_challenge (rfc7636) required for public clients"))
+				}
+			} else {
+				codeChallengeMethod := ar.CodeChallengeMethod
+				// allowed values are "plain" (default) and "S256", per https://tools.ietf.org/html/rfc7636#section-4.3
+				if len(codeChallengeMethod) == 0 {
+					codeChallengeMethod = PKCE_PLAIN
+				}
+				if codeChallengeMethod != PKCE_PLAIN && codeChallengeMethod != PKCE_S256 {
+					// https://tools.ietf.org/html/rfc7636#section-4.4.1
+					return errorWithRedirect(ar, NewNisoError(E_INVALID_REQUEST, "code_challenge_method transform algorithm not supported (rfc7636)"))
+				}
+
+				// https://tools.ietf.org/html/rfc7636#section-4.2
+				if matched := pkceMatcher.MatchString(codeChallenge); !matched {
+					return errorWithRedirect(ar, NewNisoError(E_INVALID_REQUEST, "code_challenge invalid (rfc7636)"))
+				}
+
+				ar.CodeChallenge = codeChallenge
+				ar.CodeChallengeMethod = codeChallengeMethod
+			}
+		}
+
+		return nil
 	}
 
-	return ret, nil
+	return errorWithRedirect(ar, NewNisoError(E_UNSUPPORTED_RESPONSE_TYPE, "request type not in server allowed authorize types"))
+
 }
 
 // errors caused by invalid client identifiers or redirect URIs will not cause redirects
@@ -155,18 +206,18 @@ func errorWithRedirect(ar *AuthorizationRequest, err error) error {
 	return nisoErr
 }
 
-// HandleAuthorizeRequest is the main entry point for handling authorization requests.
+// HandleHTTPAuthorizeRequest is the main entry point for handling authorization requests.
 // This method will always return a Response, even if there was an error processing the request, which should be
 // rendered for a user. It may also return an error in the second argument which can be logged by the caller.
-func (s *Server) HandleAuthorizeRequest(ctx context.Context, r *http.Request, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
-	ar, err := s.GenerateAuthorizeRequest(ctx, r)
+func (s *Server) HandleHTTPAuthorizeRequest(ctx context.Context, r *http.Request, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
+	ar, err := s.GenerateAuthorizationRequest(ctx, r)
 	if err != nil {
 		return toNisoError(err).AsResponse(), err
 	}
 
 	isAuthorized, err := isAuthorizedCb(ar)
 	if err != nil {
-		err = NewWrappedNisoError(E_SERVER_ERROR, err, "authorization check failed")
+		err = errorWithRedirect(ar, NewWrappedNisoError(E_SERVER_ERROR, err, "authorization check failed"))
 		return toNisoError(err).AsResponse(), err
 	}
 
@@ -181,44 +232,6 @@ func (s *Server) HandleAuthorizeRequest(ctx context.Context, r *http.Request, is
 	}
 
 	return resp, nil
-}
-
-func (s *Server) generateAuthorizeRequest(ctx context.Context, ret *AuthorizationRequest, clientData *ClientData) (*AuthorizationRequest, error) {
-	if s.Config.AllowedAuthorizeTypes.Exists(ret.ResponseType) {
-		ret.Expiration = s.Config.AuthorizationExpiration
-
-		if ret.ResponseType == CODE {
-			// Optional PKCE support (https://tools.ietf.org/html/rfc7636)
-			if codeChallenge := ret.CodeChallenge; len(codeChallenge) == 0 {
-				if s.Config.RequirePKCEForPublicClients && clientData.ClientSecret == "" {
-					// https://tools.ietf.org/html/rfc7636#section-4.4.1
-					return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge (rfc7636) required for public clients")
-				}
-			} else {
-				codeChallengeMethod := ret.CodeChallengeMethod
-				// allowed values are "plain" (default) and "S256", per https://tools.ietf.org/html/rfc7636#section-4.3
-				if len(codeChallengeMethod) == 0 {
-					codeChallengeMethod = PKCE_PLAIN
-				}
-				if codeChallengeMethod != PKCE_PLAIN && codeChallengeMethod != PKCE_S256 {
-					// https://tools.ietf.org/html/rfc7636#section-4.4.1
-					return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge_method transform algorithm not supported (rfc7636)")
-				}
-
-				// https://tools.ietf.org/html/rfc7636#section-4.2
-				if matched := pkceMatcher.MatchString(codeChallenge); !matched {
-					return nil, NewNisoError(E_INVALID_REQUEST, "code_challenge invalid (rfc7636)")
-				}
-
-				ret.CodeChallenge = codeChallenge
-				ret.CodeChallengeMethod = codeChallengeMethod
-			}
-		}
-
-		return ret, nil
-	}
-
-	return nil, NewNisoError(E_UNSUPPORTED_RESPONSE_TYPE, "request type not in server allowed authorize types")
 }
 
 // FinishAuthorizeRequest takes in a authorization request and returns a response to the client or an error

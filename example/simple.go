@@ -16,7 +16,7 @@ func main() {
 	http.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
 
-		resp, err := server.HandleAuthorizeRequest(
+		resp, err := server.HandleHTTPAuthorizeRequest(
 			ctx,
 			r,
 			func(ar *niso.AuthorizationRequest) (bool, error) {
@@ -34,7 +34,7 @@ func main() {
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.TODO()
 
-		resp, err := server.HandleAccessRequest(
+		resp, err := server.HandleHTTPAccessRequest(
 			ctx,
 			r,
 			func(ar *niso.AccessRequest) (bool, error) {

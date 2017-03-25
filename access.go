@@ -118,10 +118,10 @@ type AccessTokenGenerator interface {
 	GenerateRefreshToken(ar *AccessRequest) (refreshToken string, err error)
 }
 
-// HandleAccessRequest is the main entry point for handling access requests.
+// HandleHTTPAccessRequest is the main entry point for handling access requests.
 // This method will always return a Response, even if there was an error processing the request, which should be
 // rendered for a user. It may also return an error in the second argument which can be logged by the caller.
-func (s *Server) HandleAccessRequest(ctx context.Context, r *http.Request, isAuthorizedCb AccessRequestAuthorizedCallback) (*Response, error) {
+func (s *Server) HandleHTTPAccessRequest(ctx context.Context, r *http.Request, isAuthorizedCb AccessRequestAuthorizedCallback) (*Response, error) {
 	ar, err := s.GenerateAccessRequest(ctx, r)
 	if err != nil {
 		return toNisoError(err).AsResponse(), err

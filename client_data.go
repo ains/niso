@@ -26,7 +26,7 @@ func getClientDataFromBasicAuth(ctx context.Context, auth *BasicAuth, storage St
 		return nil, NewNisoError(E_UNAUTHORIZED_CLIENT, "invalid secret for client")
 	}
 
-	return clientData, err
+	return clientData, nil
 }
 
 func getClientData(ctx context.Context, clientID string, storage Storage) (*ClientData, error) {
@@ -43,5 +43,5 @@ func getClientData(ctx context.Context, clientID string, storage Storage) (*Clie
 		return nil, NewNisoError(E_SERVER_ERROR, "client does not have a valid redirect uri set")
 	}
 
-	return clientData, err
+	return clientData, nil
 }

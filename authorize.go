@@ -33,6 +33,9 @@ var (
 // errors returned by this function will result in internal server errors being returned
 type AuthRequestAuthorizedCallback func(ar *AuthorizationRequest) (bool, error)
 
+// AuthRequestGenerator generates and returns an AuthorizationRequest to process or an error.
+type AuthRequestGenerator func() (*AuthorizationRequest, error)
+
 // AuthorizationRequest represents an incoming authorization request
 type AuthorizationRequest struct {
 	ResponseType AuthorizeResponseType
@@ -103,55 +106,49 @@ type AuthorizeTokenGenerator interface {
 
 // GenerateAuthorizationRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
 func (s *Server) GenerateAuthorizationRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
-	clientID := r.FormValue("client_id")
+	ar := authorizationRequestFromHTTPRequest(r)
 
 	// must have a valid client
-	clientData, err := getClientData(ctx, clientID, s.Storage)
+	clientData, err := getClientData(ctx, ar.ClientID, s.Storage)
 	if err != nil {
 		return nil, err
 	}
+	s.updateRedirectURI(clientData, ar)
 
-	// if there are multiple client redirect uri's don't set the uri
-	redirectURI := r.FormValue("redirect_uri")
-	clientRedirectURI := clientData.RedirectURI
-	URISeparator := s.Config.RedirectURISeparator
-	if redirectURI == "" && firstURI(clientRedirectURI, URISeparator) == clientRedirectURI {
-		redirectURI = firstURI(clientRedirectURI, URISeparator)
-	}
-
-	ar := &AuthorizationRequest{
-		ClientID:            clientID,
-		RedirectURI:         redirectURI,
-		State:               r.FormValue("state"),
-		Scope:               r.FormValue("scope"),
-		ResponseType:        AuthorizeResponseType(r.FormValue("response_type")),
-		CodeChallenge:       r.FormValue("code_challenge"),
-		CodeChallengeMethod: PKCECodeChallengeMethod(r.FormValue("code_challenge_method")),
-	}
-
-	if err := s.validateAuthorizationRequest(ctx, ar); err != nil {
+	if err := s.validateAuthorizationRequest(ctx, clientData, ar); err != nil {
 		return nil, err
 	}
 
 	return ar, nil
 }
 
-func (s *Server) validateAuthorizationRequest(ctx context.Context, ar *AuthorizationRequest) error {
-	// Validate redirect uri - invalid redirect URI's do not produce redirecting errors.
-	reqRedirectURI := ar.RedirectURI
-	// must have a valid client
-	clientData, err := getClientData(ctx, ar.ClientID, s.Storage)
-	if err != nil {
-		return err
+func authorizationRequestFromHTTPRequest(r *http.Request) *AuthorizationRequest {
+	return &AuthorizationRequest{
+		ClientID:            r.FormValue("client_id"),
+		RedirectURI:         r.FormValue("redirect_uri"),
+		State:               r.FormValue("state"),
+		Scope:               r.FormValue("scope"),
+		ResponseType:        AuthorizeResponseType(r.FormValue("response_type")),
+		CodeChallenge:       r.FormValue("code_challenge"),
+		CodeChallengeMethod: PKCECodeChallengeMethod(r.FormValue("code_challenge_method")),
 	}
+}
 
-	// check redirect uri, if there are multiple client redirect uri's don't set the uri
+func (s *Server) updateRedirectURI(clientData *ClientData, ar *AuthorizationRequest) {
 	clientRedirectURI := clientData.RedirectURI
 	URISeparator := s.Config.RedirectURISeparator
-	if reqRedirectURI == "" && firstURI(clientRedirectURI, URISeparator) == clientRedirectURI {
-		reqRedirectURI = firstURI(clientRedirectURI, URISeparator)
+
+	// Set access request redirectURI if it is empty and client has only one redirect URI
+	if ar.RedirectURI == "" && firstURI(clientRedirectURI, URISeparator) == clientRedirectURI {
+		ar.RedirectURI = firstURI(clientRedirectURI, URISeparator)
 	}
-	if err = validateURIList(clientRedirectURI, reqRedirectURI, URISeparator); err != nil {
+}
+
+func (s *Server) validateAuthorizationRequest(ctx context.Context, clientData *ClientData, ar *AuthorizationRequest) error {
+	// check redirect uri
+	clientRedirectURI := clientData.RedirectURI
+	URISeparator := s.Config.RedirectURISeparator
+	if err := validateURIList(clientRedirectURI, ar.RedirectURI, URISeparator); err != nil {
 		return NewWrappedNisoError(E_INVALID_REQUEST, err, "specified redirect_uri not valid for the given client_id")
 	}
 
@@ -210,8 +207,31 @@ func errorWithRedirect(ar *AuthorizationRequest, err error) error {
 // This method will always return a Response, even if there was an error processing the request, which should be
 // rendered for a user. It may also return an error in the second argument which can be logged by the caller.
 func (s *Server) HandleHTTPAuthorizeRequest(ctx context.Context, r *http.Request, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
-	ar, err := s.GenerateAuthorizationRequest(ctx, r)
+	return s.HandleAuthorizeRequest(
+		ctx,
+		func() (*AuthorizationRequest, error) {
+			return authorizationRequestFromHTTPRequest(r), nil
+		},
+		isAuthorizedCb,
+	)
+}
+
+// HandleAuthorizeRequest is the main entry point for handling authorization requests.
+// It can take a method which generates the AuthRequest struct to use for the authorization
+// This method will always return a Response, even if there was an error processing the request, which should be
+// rendered for a user. It may also return an error in the second argument which can be logged by the caller.
+func (s *Server) HandleAuthorizeRequest(ctx context.Context, f AuthRequestGenerator, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
+	ar, err := f()
 	if err != nil {
+		return toNisoError(err).AsResponse(), err
+	}
+
+	clientData, err := getClientData(ctx, ar.ClientID, s.Storage)
+	if err != nil {
+		return toNisoError(err).AsResponse(), err
+	}
+	s.updateRedirectURI(clientData, ar)
+	if err := s.validateAuthorizationRequest(ctx, clientData, ar); err != nil {
 		return toNisoError(err).AsResponse(), err
 	}
 

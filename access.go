@@ -385,10 +385,6 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	resp := NewResponse()
 
 	redirectURI := ar.RedirectURI
-	// Get redirect uri from AccessRequest if it's there (e.g., refresh token request)
-	if ar.RedirectURI != "" {
-		redirectURI = ar.RedirectURI
-	}
 
 	var ret *AccessData
 	var err error

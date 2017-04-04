@@ -8,7 +8,7 @@ type Storage interface {
 	Close() error
 
 	// GetClientData fetches the data for a ClientData by id
-	// Should return NotFoundError, so an E_INVALID_CLIENT error will be returned instead of E_SERVER_ERROR
+	// Should return NotFoundError, so an EInvalidClient error will be returned instead of EServerError
 	GetClientData(ctx context.Context, id string) (*ClientData, error)
 
 	// GetAuthorizeData looks up AuthorizeData by a code.

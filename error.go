@@ -13,20 +13,20 @@ type ErrorCode string
 
 // OAuth2 error codes (https://tools.ietf.org/html/rfc6749#section-4.1.2.1)
 const (
-	E_INVALID_REQUEST           ErrorCode = "invalid_request"
-	E_UNAUTHORIZED_CLIENT       ErrorCode = "unauthorized_client"
-	E_ACCESS_DENIED             ErrorCode = "access_denied"
-	E_UNSUPPORTED_RESPONSE_TYPE ErrorCode = "unsupported_response_type"
-	E_INVALID_SCOPE             ErrorCode = "invalid_scope"
-	E_SERVER_ERROR              ErrorCode = "server_error"
-	E_TEMPORARILY_UNAVAILABLE   ErrorCode = "temporarily_unavailable"
-	E_UNSUPPORTED_GRANT_TYPE    ErrorCode = "unsupported_grant_type"
-	E_INVALID_GRANT             ErrorCode = "invalid_grant"
-	E_INVALID_CLIENT            ErrorCode = "invalid_client"
+	EInvalidRequest          ErrorCode = "invalid_request"
+	EUnauthorizedClient      ErrorCode = "unauthorized_client"
+	EAccessDenied            ErrorCode = "access_denied"
+	EUnsupportedResponseType ErrorCode = "unsupported_response_type"
+	EInvalidScope            ErrorCode = "invalid_scope"
+	EServerError             ErrorCode = "server_error"
+	ETemporarilyUnavailable  ErrorCode = "temporarily_unavailable"
+	EUnsupportedGrantType    ErrorCode = "unsupported_grant_type"
+	EInvalidGrant            ErrorCode = "invalid_grant"
+	EInvalidClient           ErrorCode = "invalid_client"
 )
 
-// NisoError is a wrapper around an existing error with an OAuth2 error code
-type NisoError struct {
+// Error is a wrapper around an existing error with an OAuth2 error code
+type Error struct {
 	Code ErrorCode
 	Err  error
 
@@ -41,18 +41,18 @@ type NisoError struct {
 	state string
 }
 
-// NewNisoError creates a new NisoError for a response error code
-func NewNisoError(code ErrorCode, message string, args ...interface{}) *NisoError {
-	return &NisoError{
+// NewError creates a new Error for a response error code
+func NewError(code ErrorCode, message string, args ...interface{}) *Error {
+	return &Error{
 		Code:    code,
 		Err:     errors.Errorf(message, args...),
 		Message: message,
 	}
 }
 
-// NewWrappedNisoError creates a new NisoError for a response error code and wraps the original error with the given description
-func NewWrappedNisoError(code ErrorCode, error error, message string, args ...interface{}) *NisoError {
-	return &NisoError{
+// NewWrappedError creates a new Error for a response error code and wraps the original error with the given description
+func NewWrappedError(code ErrorCode, error error, message string, args ...interface{}) *Error {
+	return &Error{
 		Code:    code,
 		Err:     errors.Wrapf(error, message, args...),
 		Message: message,
@@ -60,21 +60,21 @@ func NewWrappedNisoError(code ErrorCode, error error, message string, args ...in
 }
 
 // SetRedirectURI set redirect uri for this error to redirect to when written to a HTTP response
-func (e *NisoError) SetRedirectURI(redirectURI string) {
+func (e *Error) SetRedirectURI(redirectURI string) {
 	e.redirectURI = redirectURI
 }
 
 // SetState sets the "state" parameter to be returned to the user when this error is rendered
-func (e *NisoError) SetState(state string) {
+func (e *Error) SetState(state string) {
 	e.state = state
 }
 
-func (e *NisoError) Error() string {
+func (e *Error) Error() string {
 	return fmt.Sprintf("(%s) %s", e.Code, e.Err.Error())
 }
 
 // AsResponse creates a response object from this error, containing it's body or a redirect if specified
-func (e *NisoError) AsResponse() *Response {
+func (e *Error) AsResponse() *Response {
 	resp := NewResponse()
 
 	// Redirect user if needed
@@ -101,7 +101,7 @@ func (e *NisoError) AsResponse() *Response {
 }
 
 // GetRedirectURI returns location to redirect user to after processing this error, or empty string if there is none
-func (e *NisoError) GetRedirectURI() (string, error) {
+func (e *Error) GetRedirectURI() (string, error) {
 	if e.redirectURI == "" {
 		return "", nil
 	}
@@ -124,7 +124,7 @@ func (e *NisoError) GetRedirectURI() (string, error) {
 }
 
 // GetResponseDict returns the fields for an error response as defined in https://tools.ietf.org/html/rfc6749#section-4.2.2.1
-func (e *NisoError) GetResponseDict() map[string]string {
+func (e *Error) GetResponseDict() map[string]string {
 	return map[string]string{
 		"error":             string(e.Code),
 		"error_description": e.Message,
@@ -132,25 +132,25 @@ func (e *NisoError) GetResponseDict() map[string]string {
 	}
 }
 
-func toNisoError(err error) *NisoError {
-	if ne, ok := err.(*NisoError); ok {
+func toInternalError(err error) *Error {
+	if ne, ok := err.(*Error); ok {
 		return ne
 	}
 
-	return &NisoError{
-		Code:    E_SERVER_ERROR,
+	return &Error{
+		Code:    EServerError,
 		Err:     err,
 		Message: err.Error(),
 	}
 }
 
 // status code to return for a given error code as per (https://tools.ietf.org/html/rfc6749#section-5.2)
-func statusCodeForError(error *NisoError) int {
-	if error.Code == E_SERVER_ERROR {
+func statusCodeForError(error *Error) int {
+	if error.Code == EServerError {
 		return 500
-	} else if error.Code == E_TEMPORARILY_UNAVAILABLE {
+	} else if error.Code == ETemporarilyUnavailable {
 		return 503
-	} else if error.Code == E_INVALID_CLIENT || error.Code == E_ACCESS_DENIED {
+	} else if error.Code == EInvalidClient || error.Code == EAccessDenied {
 		return 401
 	}
 

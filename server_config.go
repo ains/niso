@@ -37,10 +37,10 @@ type ServerConfig struct {
 	// Token type to return
 	TokenType string
 
-	// List of allowed authorize types (only CODE by default)
+	// List of allowed authorize types (only ResponseTypeCode by default)
 	AllowedAuthorizeTypes AllowedAuthorizeTypes
 
-	// List of allowed access types (only AUTHORIZATION_CODE by default)
+	// List of allowed access types (only GrantTypeAuthorizationCode by default)
 	AllowedAccessTypes AllowedAccessTypes
 
 	// If true allows client secret also in params, else only in
@@ -64,8 +64,8 @@ func NewServerConfig() *ServerConfig {
 		AuthorizationExpiration:   250,
 		AccessExpiration:          3600,
 		TokenType:                 "Bearer",
-		AllowedAuthorizeTypes:     AllowedAuthorizeTypes{CODE},
-		AllowedAccessTypes:        AllowedAccessTypes{AUTHORIZATION_CODE},
+		AllowedAuthorizeTypes:     AllowedAuthorizeTypes{ResponseTypeCode},
+		AllowedAccessTypes:        AllowedAccessTypes{GrantTypeAuthorizationCode},
 		AllowClientSecretInParams: false,
 	}
 }

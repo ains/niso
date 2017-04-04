@@ -29,7 +29,7 @@ type NisoIntegrationTestSuite struct {
 
 func (s *NisoIntegrationTestSuite) SetupSuite() {
 	config := NewServerConfig()
-	config.AllowedAccessTypes = AllowedAccessTypes{AUTHORIZATION_CODE}
+	config.AllowedAccessTypes = AllowedAccessTypes{GrantTypeAuthorizationCode}
 	server := newTestServer(config)
 	server.Storage = newIntegrationTestStorage()
 

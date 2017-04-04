@@ -13,10 +13,10 @@ import (
 
 func TestAccessAuthorizationCode(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAccessTypes = AllowedAccessTypes{AUTHORIZATION_CODE}
+	config.AllowedAccessTypes = AllowedAccessTypes{GrantTypeAuthorizationCode}
 	server := newTestServer(config)
 
-	req := makeTestRequest(t, AUTHORIZATION_CODE)
+	req := makeTestRequest(t, GrantTypeAuthorizationCode)
 	req.Form.Set("code", "9999")
 	req.Form.Set("state", "a")
 
@@ -34,10 +34,10 @@ func TestAccessAuthorizationCode(t *testing.T) {
 
 func TestAccessRefreshToken(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAccessTypes = AllowedAccessTypes{REFRESH_TOKEN}
+	config.AllowedAccessTypes = AllowedAccessTypes{GrantTypeRefreshToken}
 	server := newTestServer(config)
 
-	req := makeTestRequest(t, REFRESH_TOKEN)
+	req := makeTestRequest(t, GrantTypeRefreshToken)
 	req.Form.Set("refresh_token", "r9999")
 	req.Form.Set("state", "a")
 
@@ -55,10 +55,10 @@ func TestAccessRefreshToken(t *testing.T) {
 
 func TestAccessPassword(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAccessTypes = AllowedAccessTypes{PASSWORD}
+	config.AllowedAccessTypes = AllowedAccessTypes{GrantTypePassword}
 	server := newTestServer(config)
 
-	req := makeTestRequest(t, PASSWORD)
+	req := makeTestRequest(t, GrantTypePassword)
 	req.Form.Set("username", "testing")
 	req.Form.Set("password", "testing")
 	req.Form.Set("state", "a")
@@ -80,10 +80,10 @@ func TestAccessPassword(t *testing.T) {
 
 func TestAccessClientCredentials(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAccessTypes = AllowedAccessTypes{CLIENT_CREDENTIALS}
+	config.AllowedAccessTypes = AllowedAccessTypes{GrantTypeClientCredentials}
 	server := newTestServer(config)
 
-	req := makeTestRequest(t, CLIENT_CREDENTIALS)
+	req := makeTestRequest(t, GrantTypeClientCredentials)
 	req.Form.Set("state", "a")
 
 	ctx := context.TODO()
@@ -122,18 +122,18 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		"bad, plain": {
 			Challenge:     "12345678901234567890123456789012345678901234567890",
 			Verifier:      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-			ExpectedError: E_INVALID_GRANT,
+			ExpectedError: EInvalidGrant,
 		},
 		"good, S256": {
 			Challenge:       "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-			ChallengeMethod: PKCE_S256,
+			ChallengeMethod: PKCES256,
 			Verifier:        "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
 		},
 		"bad, S256": {
 			Challenge:       "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-			ChallengeMethod: PKCE_S256,
+			ChallengeMethod: PKCES256,
 			Verifier:        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-			ExpectedError:   E_INVALID_GRANT,
+			ExpectedError:   EInvalidGrant,
 		},
 		"missing from storage": {
 			Challenge: "",
@@ -144,7 +144,7 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 
 	for _, test := range testcases {
 		config := NewServerConfig()
-		config.AllowedAccessTypes = AllowedAccessTypes{AUTHORIZATION_CODE}
+		config.AllowedAccessTypes = AllowedAccessTypes{GrantTypeAuthorizationCode}
 		server := newTestServer(config)
 		server.Storage.SaveAuthorizeData(ctx, &AuthorizeData{
 			ClientID:            "public-client",
@@ -156,9 +156,9 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 			CodeChallengeMethod: PKCECodeChallengeMethod(test.ChallengeMethod),
 		})
 
-		req := makeTestRequest(t, AUTHORIZATION_CODE)
+		req := makeTestRequest(t, GrantTypeAuthorizationCode)
 		req.SetBasicAuth("public-client", "")
-		req.Form.Set("grant_type", string(AUTHORIZATION_CODE))
+		req.Form.Set("grant_type", string(GrantTypeAuthorizationCode))
 		req.Form.Set("code", "pkce-code")
 		req.Form.Set("state", "a")
 		req.Form.Set("code_verifier", test.Verifier)
@@ -166,8 +166,8 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		ar, err := server.GenerateAccessRequest(ctx, req)
 		if test.ExpectedError != "" {
 			require.Error(t, err)
-			require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
-			assert.Equal(t, test.ExpectedError, err.(*NisoError).Code)
+			require.IsType(t, &Error{}, err, "error should be of type NisoError")
+			assert.Equal(t, test.ExpectedError, err.(*Error).Code)
 		} else {
 			require.NoError(t, err)
 

@@ -137,7 +137,11 @@ func toNisoError(err error) *NisoError {
 		return ne
 	}
 
-	return NewWrappedNisoError(E_SERVER_ERROR, err, "unknown error")
+	return &NisoError{
+		Code:    E_SERVER_ERROR,
+		Err:     err,
+		Message: err.Error(),
+	}
 }
 
 // status code to return for a given error code as per (https://tools.ietf.org/html/rfc6749#section-5.2)

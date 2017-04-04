@@ -223,6 +223,22 @@ func (s *Server) HandleHTTPAuthorizeRequest(ctx context.Context, r *http.Request
 func (s *Server) HandleAuthorizeRequest(ctx context.Context, f AuthRequestGenerator, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
 	ar, err := f()
 	if err != nil {
+		err = toNisoError(err)
+
+		// AuthorizationRequest generation failed for some reason, see if an AR was returned, if so use it's redirectURI if valid
+		// Any errors during this step where we attempt to redirect are ignored in favour of the error that actually
+		// occurred when generating the AR
+		if ar != nil {
+			clientData, clientErr := getClientData(ctx, ar.ClientID, s.Storage)
+			if clientErr == nil {
+				s.updateRedirectURI(clientData, ar)
+				if validationErr := s.validateAuthorizationRequest(ctx, clientData, ar); validationErr == nil {
+					err = errorWithRedirect(ar, err)
+					return toNisoError(err).AsResponse(), err
+				}
+			}
+		}
+
 		return toNisoError(err).AsResponse(), err
 	}
 

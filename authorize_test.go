@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,6 +63,61 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
 	assert.Equal(t, "http://localhost:14000/appauth?error=access_denied&error_description=access+denied&state=a", respRedirectURI)
 
+}
+
+func TestAuthorizeRequestGenerationFailure(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	server := newTestServer(config)
+
+	ctx := context.TODO()
+	_, err := server.HandleAuthorizeRequest(
+		ctx,
+		func() (*AuthorizationRequest, error) {
+			return nil, errors.New("fail")
+		},
+		func(_ *AuthorizationRequest) (bool, error) { return false, nil },
+	)
+	assertNisoError(
+		t,
+		err,
+		E_SERVER_ERROR,
+		"(server_error) fail",
+	)
+}
+
+func TestAuthorizeRequestGenerationFailureWithRequest(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	server := newTestServer(config)
+
+	ctx := context.TODO()
+	resp, err := server.HandleAuthorizeRequest(
+		ctx,
+		func() (*AuthorizationRequest, error) {
+			return &AuthorizationRequest{
+				ResponseType: CODE,
+				ClientID:     "1234",
+			}, errors.New("fail")
+		},
+		func(_ *AuthorizationRequest) (bool, error) { return false, nil },
+	)
+	assertNisoError(
+		t,
+		err,
+		E_SERVER_ERROR,
+		"(server_error) fail",
+	)
+
+	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:14000/appauth?error=server_error&error_description=fail", redirectURI)
+
+	respRedirectURI, err := resp.GetRedirectURL()
+	require.NoError(t, err)
+
+	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
+	assert.Equal(t, "http://localhost:14000/appauth?error=server_error&error_description=fail", respRedirectURI)
 }
 
 func TestAuthorizeInvalidClient(t *testing.T) {

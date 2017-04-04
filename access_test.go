@@ -166,8 +166,8 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		ar, err := server.GenerateAccessRequest(ctx, req)
 		if test.ExpectedError != "" {
 			require.Error(t, err)
-			require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
-			assert.Equal(t, test.ExpectedError, err.(*NisoError).Code)
+			require.IsType(t, &Error{}, err, "error should be of type NisoError")
+			assert.Equal(t, test.ExpectedError, err.(*Error).Code)
 		} else {
 			require.NoError(t, err)
 

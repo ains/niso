@@ -53,7 +53,7 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 		"(access_denied) access denied",
 	)
 
-	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	redirectURI, err := err.(*Error).GetRedirectURI()
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:14000/appauth?error=access_denied&error_description=access+denied&state=a", redirectURI)
 
@@ -109,7 +109,7 @@ func TestAuthorizeRequestGenerationFailureWithRequest(t *testing.T) {
 		"(server_error) fail",
 	)
 
-	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	redirectURI, err := err.(*Error).GetRedirectURI()
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:14000/appauth?error=server_error&error_description=fail", redirectURI)
 
@@ -138,7 +138,7 @@ func TestAuthorizeInvalidClient(t *testing.T) {
 		"(unauthorized_client) could not find client: client not found",
 	)
 
-	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	redirectURI, err := err.(*Error).GetRedirectURI()
 	require.NoError(t, err)
 	assert.Equal(t, "", redirectURI)
 }
@@ -161,7 +161,7 @@ func TestAuthorizeInvalidRedirectURI(t *testing.T) {
 		"(invalid_request) specified redirect_uri not valid for the given client_id: no matching uri found in allowed uri list: http://localhost:14000/appauth / invalid",
 	)
 
-	redirectURI, err := err.(*NisoError).GetRedirectURI()
+	redirectURI, err := err.(*Error).GetRedirectURI()
 	require.NoError(t, err)
 	assert.Equal(t, "", redirectURI)
 }
@@ -357,6 +357,6 @@ func assertNisoError(t *testing.T, err error, expectedCode ErrorCode, expectedMe
 		"expected %s error",
 		string(expectedCode),
 	)
-	require.IsType(t, &NisoError{}, err, "error should be of type NisoError")
-	assert.Equal(t, expectedCode, err.(*NisoError).Code)
+	require.IsType(t, &Error{}, err, "error should be of type Error")
+	assert.Equal(t, expectedCode, err.(*Error).Code)
 }

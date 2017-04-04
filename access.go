@@ -14,11 +14,11 @@ type GrantType string
 
 // https://tools.ietf.org/html/rfc6749#appendix-A.10
 const (
-	AUTHORIZATION_CODE GrantType = "authorization_code"
-	REFRESH_TOKEN      GrantType = "refresh_token"
-	PASSWORD           GrantType = "password"
-	CLIENT_CREDENTIALS GrantType = "client_credentials"
-	IMPLICIT           GrantType = "__implicit"
+	GrantTypeAuthorizationCode GrantType = "authorization_code"
+	GrantTypeRefreshToken      GrantType = "refresh_token"
+	GrantTypePassword          GrantType = "password"
+	GrantTypeClientCredentials GrantType = "client_credentials"
+	GrantTypeImplicit          GrantType = "__implicit"
 )
 
 // AccessRequestAuthorizedCallback returns if an access request should succeed or access should be denied.
@@ -129,12 +129,12 @@ func (s *Server) HandleHTTPAccessRequest(ctx context.Context, r *http.Request, i
 
 	isAuthorized, err := isAuthorizedCb(ar)
 	if err != nil {
-		err = NewWrappedError(E_SERVER_ERROR, err, "authorization check failed")
+		err = NewWrappedError(EServerError, err, "authorization check failed")
 		return toInternalError(err).AsResponse(), err
 	}
 
 	if !isAuthorized {
-		err = NewError(E_ACCESS_DENIED, "access denied")
+		err = NewError(EAccessDenied, "access denied")
 		return toInternalError(err).AsResponse(), err
 	}
 
@@ -150,39 +150,39 @@ func (s *Server) HandleHTTPAccessRequest(ctx context.Context, r *http.Request, i
 func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
 	// Only allow GET (when AllowGetAccessRequest set) or POST
 	if r.Method == "GET" && !s.Config.AllowGetAccessRequest {
-		return nil, NewError(E_INVALID_REQUEST, "GET method not allowed for access requests")
+		return nil, NewError(EInvalidRequest, "GET method not allowed for access requests")
 	} else if r.Method != "POST" {
-		return nil, NewError(E_INVALID_REQUEST, "access requests must POST verb")
+		return nil, NewError(EInvalidRequest, "access requests must POST verb")
 	}
 
 	grantType := GrantType(r.FormValue("grant_type"))
 	if s.Config.AllowedAccessTypes.Exists(grantType) {
 		switch grantType {
-		case AUTHORIZATION_CODE:
+		case GrantTypeAuthorizationCode:
 			return s.handleAuthorizationCodeRequest(ctx, r)
-		case REFRESH_TOKEN:
+		case GrantTypeRefreshToken:
 			return s.handleRefreshTokenRequest(ctx, r)
-		case PASSWORD:
+		case GrantTypePassword:
 			return s.handlePasswordRequest(ctx, r)
-		case CLIENT_CREDENTIALS:
+		case GrantTypeClientCredentials:
 			return s.handleClientCredentialsRequest(ctx, r)
 		}
 	}
 
-	return nil, NewError(E_UNSUPPORTED_GRANT_TYPE, "unsupported grant type")
+	return nil, NewError(EUnsupportedGrantType, "unsupported grant type")
 }
 
 func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
 	// get client authentication
 	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
 	if err != nil {
-		return nil, NewWrappedError(E_INVALID_REQUEST, err, "failed to get client authentication")
+		return nil, NewWrappedError(EInvalidRequest, err, "failed to get client authentication")
 	}
 
 	// generate access token
 	ret := &AccessRequest{
 		ClientID:        auth.Username,
-		GrantType:       AUTHORIZATION_CODE,
+		GrantType:       GrantTypeAuthorizationCode,
 		Code:            r.FormValue("code"),
 		CodeVerifier:    r.FormValue("code_verifier"),
 		GenerateRefresh: true,
@@ -192,45 +192,45 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 
 	// "code" is required
 	if ret.Code == "" {
-		return nil, NewError(E_INVALID_GRANT, "no authorization code provided")
+		return nil, NewError(EInvalidGrant, "no authorization code provided")
 	}
 
 	// must be a valid authorization code
 	ret.AuthorizeData, err = s.Storage.GetAuthorizeData(ctx, ret.Code)
 	if err != nil {
-		return nil, NewWrappedError(E_INVALID_GRANT, err, "could not load data for authorization code")
+		return nil, NewWrappedError(EInvalidGrant, err, "could not load data for authorization code")
 	}
 
 	// authorization code must be from the client id of current request
 	if ret.AuthorizeData.ClientID != ret.ClientID {
-		return nil, NewError(E_INVALID_GRANT, "invalid client id for authorization code")
+		return nil, NewError(EInvalidGrant, "invalid client id for authorization code")
 	}
 
 	// authorization code must not be expired
 	if ret.AuthorizeData.IsExpiredAt(s.Now()) {
-		return nil, NewError(E_INVALID_GRANT, "authorization code expired")
+		return nil, NewError(EInvalidGrant, "authorization code expired")
 	}
 
 	// Verify PKCE, if present in the authorization data
 	if len(ret.AuthorizeData.CodeChallenge) > 0 {
 		// https://tools.ietf.org/html/rfc7636#section-4.1
 		if matched := pkceMatcher.MatchString(ret.CodeVerifier); !matched {
-			return nil, NewError(E_INVALID_REQUEST, "code_verifier invalid (rfc7636)")
+			return nil, NewError(EInvalidRequest, "code_verifier invalid (rfc7636)")
 		}
 
 		// https: //tools.ietf.org/html/rfc7636#section-4.6
 		codeVerifier := ""
 		switch ret.AuthorizeData.CodeChallengeMethod {
-		case "", PKCE_PLAIN:
+		case "", PKCEPlain:
 			codeVerifier = ret.CodeVerifier
-		case PKCE_S256:
+		case PKCES256:
 			hash := sha256.Sum256([]byte(ret.CodeVerifier))
 			codeVerifier = base64.RawURLEncoding.EncodeToString(hash[:])
 		default:
-			return nil, NewError(E_INVALID_REQUEST, "code_challenge_method transform algorithm not supported (rfc7636)")
+			return nil, NewError(EInvalidRequest, "code_challenge_method transform algorithm not supported (rfc7636)")
 		}
 		if codeVerifier != ret.AuthorizeData.CodeChallenge {
-			return nil, NewError(E_INVALID_GRANT, "code_verifier failed comparison with code_challenge")
+			return nil, NewError(EInvalidGrant, "code_verifier failed comparison with code_challenge")
 		}
 	}
 
@@ -275,7 +275,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	// generate access token
 	req := &AccessRequest{
 		ClientID:        auth.Username,
-		GrantType:       REFRESH_TOKEN,
+		GrantType:       GrantTypeRefreshToken,
 		Code:            r.FormValue("refresh_token"),
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
@@ -285,18 +285,18 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 
 	// "refresh_token" is required
 	if req.Code == "" {
-		return nil, NewError(E_INVALID_GRANT, "no refresh token provided")
+		return nil, NewError(EInvalidGrant, "no refresh token provided")
 	}
 
 	// must be a valid refresh code
 	req.PreviousRefreshToken, err = s.Storage.GetRefreshTokenData(ctx, req.Code)
 	if err != nil {
-		return nil, NewWrappedError(E_INVALID_GRANT, err, "failed to get refresh token data from storage")
+		return nil, NewWrappedError(EInvalidGrant, err, "failed to get refresh token data from storage")
 	}
 
 	// client must be the same as the previous token
 	if req.PreviousRefreshToken.ClientID != req.ClientID {
-		return nil, NewError(E_INVALID_CLIENT, "request client id must be the same from previous token")
+		return nil, NewError(EInvalidClient, "request client id must be the same from previous token")
 	}
 
 	// set rest of data
@@ -307,7 +307,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	if extraScopes(req.PreviousRefreshToken.Scope, req.Scope) {
-		return nil, NewError(E_ACCESS_DENIED, "the requested scope must not include any scope not originally granted by the resource owner")
+		return nil, NewError(EAccessDenied, "the requested scope must not include any scope not originally granted by the resource owner")
 	}
 
 	return req, nil
@@ -323,7 +323,7 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 	// generate access token
 	ret := &AccessRequest{
 		ClientID:        auth.Username,
-		GrantType:       PASSWORD,
+		GrantType:       GrantTypePassword,
 		Username:        r.FormValue("username"),
 		Password:        r.FormValue("password"),
 		Scope:           r.FormValue("scope"),
@@ -334,10 +334,10 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 
 	// "username" and "password" is required
 	if ret.Username == "" {
-		return nil, NewError(E_INVALID_GRANT, "username field not set")
+		return nil, NewError(EInvalidGrant, "username field not set")
 	}
 	if ret.Password == "" {
-		return nil, NewError(E_INVALID_GRANT, "password field not set")
+		return nil, NewError(EInvalidGrant, "password field not set")
 	}
 
 	// must have a valid client
@@ -362,7 +362,7 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 	// generate access token
 	ret := &AccessRequest{
 		ClientID:        auth.Username,
-		GrantType:       CLIENT_CREDENTIALS,
+		GrantType:       GrantTypeClientCredentials,
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: false,
 		Expiration:      s.Config.AccessExpiration,
@@ -402,7 +402,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	// generate access token
 	ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ar)
 	if err != nil {
-		return nil, NewWrappedError(E_SERVER_ERROR, err, "failed to generate access token")
+		return nil, NewWrappedError(EServerError, err, "failed to generate access token")
 	}
 
 	if ar.GenerateRefresh {
@@ -415,12 +415,12 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		}
 		rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
 		if err != nil {
-			return nil, NewWrappedError(E_SERVER_ERROR, err, "failed to generate refresh token")
+			return nil, NewWrappedError(EServerError, err, "failed to generate refresh token")
 		}
 
 		// Save Refresh Token
 		if err := s.Storage.SaveRefreshTokenData(ctx, rt); err != nil {
-			return nil, NewWrappedError(E_SERVER_ERROR, err, "could not save new refresh token data")
+			return nil, NewWrappedError(EServerError, err, "could not save new refresh token data")
 		}
 
 		// Attach refresh token string to output
@@ -429,7 +429,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 
 	// save access token
 	if err = s.Storage.SaveAccessData(ctx, ret); err != nil {
-		return nil, NewWrappedError(E_SERVER_ERROR, err, "failed to save access data")
+		return nil, NewWrappedError(EServerError, err, "failed to save access data")
 	}
 
 	// remove authorization token

@@ -23,7 +23,7 @@ func getClientDataFromBasicAuth(ctx context.Context, auth *BasicAuth, storage St
 	}
 
 	if !clientData.ValidSecret(auth.Password) {
-		return nil, NewError(E_UNAUTHORIZED_CLIENT, "invalid secret for client")
+		return nil, NewError(EUnauthorizedClient, "invalid secret for client")
 	}
 
 	return clientData, nil
@@ -33,14 +33,14 @@ func getClientData(ctx context.Context, clientID string, storage Storage) (*Clie
 	clientData, err := storage.GetClientData(ctx, clientID)
 	if err != nil {
 		if _, ok := err.(*NotFoundError); ok {
-			return nil, NewWrappedError(E_UNAUTHORIZED_CLIENT, err, "could not find client")
+			return nil, NewWrappedError(EUnauthorizedClient, err, "could not find client")
 		}
 
-		return nil, NewWrappedError(E_SERVER_ERROR, err, "failed to get client data from storage")
+		return nil, NewWrappedError(EServerError, err, "failed to get client data from storage")
 	}
 
 	if clientData.RedirectURI == "" {
-		return nil, NewError(E_SERVER_ERROR, "client does not have a valid redirect uri set")
+		return nil, NewError(EServerError, "client does not have a valid redirect uri set")
 	}
 
 	return clientData, nil

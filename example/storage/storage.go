@@ -39,7 +39,7 @@ func (s *ExampleStorage) Close() error {
 }
 
 // GetClientData fetches the data for a ClientData by id
-// Should return NotFoundError, so an E_INVALID_CLIENT error will be returned instead of E_SERVER_ERROR
+// Should return NotFoundError, so an EInvalidClient error will be returned instead of EServerError
 func (s *ExampleStorage) GetClientData(_ context.Context, id string) (*niso.ClientData, error) {
 	if c, ok := s.clients[id]; ok {
 		return c, nil

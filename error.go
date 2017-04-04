@@ -13,16 +13,16 @@ type ErrorCode string
 
 // OAuth2 error codes (https://tools.ietf.org/html/rfc6749#section-4.1.2.1)
 const (
-	E_INVALID_REQUEST           ErrorCode = "invalid_request"
-	E_UNAUTHORIZED_CLIENT       ErrorCode = "unauthorized_client"
-	E_ACCESS_DENIED             ErrorCode = "access_denied"
-	E_UNSUPPORTED_RESPONSE_TYPE ErrorCode = "unsupported_response_type"
-	E_INVALID_SCOPE             ErrorCode = "invalid_scope"
-	E_SERVER_ERROR              ErrorCode = "server_error"
-	E_TEMPORARILY_UNAVAILABLE   ErrorCode = "temporarily_unavailable"
-	E_UNSUPPORTED_GRANT_TYPE    ErrorCode = "unsupported_grant_type"
-	E_INVALID_GRANT             ErrorCode = "invalid_grant"
-	E_INVALID_CLIENT            ErrorCode = "invalid_client"
+	EInvalidRequest          ErrorCode = "invalid_request"
+	EUnauthorizedClient      ErrorCode = "unauthorized_client"
+	EAccessDenied            ErrorCode = "access_denied"
+	EUnsupportedResponseType ErrorCode = "unsupported_response_type"
+	EInvalidScope            ErrorCode = "invalid_scope"
+	EServerError             ErrorCode = "server_error"
+	ETemporarilyUnavailable  ErrorCode = "temporarily_unavailable"
+	EUnsupportedGrantType    ErrorCode = "unsupported_grant_type"
+	EInvalidGrant            ErrorCode = "invalid_grant"
+	EInvalidClient           ErrorCode = "invalid_client"
 )
 
 // Error is a wrapper around an existing error with an OAuth2 error code
@@ -138,7 +138,7 @@ func toInternalError(err error) *Error {
 	}
 
 	return &Error{
-		Code:    E_SERVER_ERROR,
+		Code:    EServerError,
 		Err:     err,
 		Message: err.Error(),
 	}
@@ -146,11 +146,11 @@ func toInternalError(err error) *Error {
 
 // status code to return for a given error code as per (https://tools.ietf.org/html/rfc6749#section-5.2)
 func statusCodeForError(error *Error) int {
-	if error.Code == E_SERVER_ERROR {
+	if error.Code == EServerError {
 		return 500
-	} else if error.Code == E_TEMPORARILY_UNAVAILABLE {
+	} else if error.Code == ETemporarilyUnavailable {
 		return 503
-	} else if error.Code == E_INVALID_CLIENT || error.Code == E_ACCESS_DENIED {
+	} else if error.Code == EInvalidClient || error.Code == EAccessDenied {
 		return 401
 	}
 

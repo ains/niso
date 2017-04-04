@@ -12,8 +12,8 @@ type AuthorizeResponseType string
 
 // AuthorizeResponseType is either code or token
 const (
-	CODE  AuthorizeResponseType = "code"
-	TOKEN AuthorizeResponseType = "token"
+	ResponseTypeCode  AuthorizeResponseType = "code"
+	ResponseTypeToken AuthorizeResponseType = "token"
 )
 
 // PKCECodeChallengeMethod is the code_challenge field as described in rfc7636
@@ -21,8 +21,8 @@ type PKCECodeChallengeMethod string
 
 // https://tools.ietf.org/html/rfc7636#section-4.2
 const (
-	PKCE_PLAIN PKCECodeChallengeMethod = "plain"
-	PKCE_S256  PKCECodeChallengeMethod = "S256"
+	PKCEPlain PKCECodeChallengeMethod = "plain"
+	PKCES256  PKCECodeChallengeMethod = "S256"
 )
 
 var (
@@ -45,7 +45,7 @@ type AuthorizationRequest struct {
 	State        string
 
 	// Token expiration in seconds. Change if different from default.
-	// If type = TOKEN, this expiration will be for the ACCESS token.
+	// If type = ResponseTypeToken, this expiration will be for the ACCESS token.
 	Expiration int32
 
 	// Optional code_challenge as described in rfc7636
@@ -149,34 +149,34 @@ func (s *Server) validateAuthorizationRequest(ctx context.Context, clientData *C
 	clientRedirectURI := clientData.RedirectURI
 	URISeparator := s.Config.RedirectURISeparator
 	if err := validateURIList(clientRedirectURI, ar.RedirectURI, URISeparator); err != nil {
-		return NewWrappedError(E_INVALID_REQUEST, err, "specified redirect_uri not valid for the given client_id")
+		return NewWrappedError(EInvalidRequest, err, "specified redirect_uri not valid for the given client_id")
 	}
 
 	// Redirect uri is valid, all future errors will redirect to redirectURI
 	if s.Config.AllowedAuthorizeTypes.Exists(ar.ResponseType) {
 		ar.Expiration = s.Config.AuthorizationExpiration
 
-		if ar.ResponseType == CODE {
+		if ar.ResponseType == ResponseTypeCode {
 			// Optional PKCE support (https://tools.ietf.org/html/rfc7636)
 			if codeChallenge := ar.CodeChallenge; len(codeChallenge) == 0 {
 				if s.Config.RequirePKCEForPublicClients && clientData.ClientSecret == "" {
 					// https://tools.ietf.org/html/rfc7636#section-4.4.1
-					return errorWithRedirect(ar, NewError(E_INVALID_REQUEST, "code_challenge (rfc7636) required for public clients"))
+					return errorWithRedirect(ar, NewError(EInvalidRequest, "code_challenge (rfc7636) required for public clients"))
 				}
 			} else {
 				codeChallengeMethod := ar.CodeChallengeMethod
 				// allowed values are "plain" (default) and "S256", per https://tools.ietf.org/html/rfc7636#section-4.3
 				if len(codeChallengeMethod) == 0 {
-					codeChallengeMethod = PKCE_PLAIN
+					codeChallengeMethod = PKCEPlain
 				}
-				if codeChallengeMethod != PKCE_PLAIN && codeChallengeMethod != PKCE_S256 {
+				if codeChallengeMethod != PKCEPlain && codeChallengeMethod != PKCES256 {
 					// https://tools.ietf.org/html/rfc7636#section-4.4.1
-					return errorWithRedirect(ar, NewError(E_INVALID_REQUEST, "code_challenge_method transform algorithm not supported (rfc7636)"))
+					return errorWithRedirect(ar, NewError(EInvalidRequest, "code_challenge_method transform algorithm not supported (rfc7636)"))
 				}
 
 				// https://tools.ietf.org/html/rfc7636#section-4.2
 				if matched := pkceMatcher.MatchString(codeChallenge); !matched {
-					return errorWithRedirect(ar, NewError(E_INVALID_REQUEST, "code_challenge invalid (rfc7636)"))
+					return errorWithRedirect(ar, NewError(EInvalidRequest, "code_challenge invalid (rfc7636)"))
 				}
 
 				ar.CodeChallenge = codeChallenge
@@ -187,7 +187,7 @@ func (s *Server) validateAuthorizationRequest(ctx context.Context, clientData *C
 		return nil
 	}
 
-	return errorWithRedirect(ar, NewError(E_UNSUPPORTED_RESPONSE_TYPE, "request type not in server allowed authorize types"))
+	return errorWithRedirect(ar, NewError(EUnsupportedResponseType, "request type not in server allowed authorize types"))
 
 }
 
@@ -253,12 +253,12 @@ func (s *Server) HandleAuthorizeRequest(ctx context.Context, f AuthRequestGenera
 
 	isAuthorized, err := isAuthorizedCb(ar)
 	if err != nil {
-		err = errorWithRedirect(ar, NewWrappedError(E_SERVER_ERROR, err, "authorization check failed"))
+		err = errorWithRedirect(ar, NewWrappedError(EServerError, err, "authorization check failed"))
 		return toInternalError(err).AsResponse(), err
 	}
 
 	if !isAuthorized {
-		err = errorWithRedirect(ar, NewError(E_ACCESS_DENIED, "access denied"))
+		err = errorWithRedirect(ar, NewError(EAccessDenied, "access denied"))
 		return toInternalError(err).AsResponse(), err
 	}
 
@@ -281,10 +281,10 @@ func (s *Server) FinishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 }
 
 func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRequest) (*Response, error) {
-	if ar.ResponseType == TOKEN {
+	if ar.ResponseType == ResponseTypeToken {
 		// generate token directly
 		ret := &AccessRequest{
-			GrantType:       IMPLICIT,
+			GrantType:       GrantTypeImplicit,
 			Code:            "",
 			ClientID:        ar.ClientID,
 			RedirectURI:     ar.RedirectURI,
@@ -327,14 +327,14 @@ func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 	// generate token code
 	code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ar)
 	if err != nil {
-		return nil, NewWrappedError(E_SERVER_ERROR, err, "failed to generate authorize token")
+		return nil, NewWrappedError(EServerError, err, "failed to generate authorize token")
 
 	}
 	ret.Code = code
 
 	// save authorization token
 	if err = s.Storage.SaveAuthorizeData(ctx, ret); err != nil {
-		return nil, NewWrappedError(E_SERVER_ERROR, err, "failed to save authorize data")
+		return nil, NewWrappedError(EServerError, err, "failed to save authorize data")
 	}
 
 	// redirect with code

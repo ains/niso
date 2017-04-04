@@ -15,10 +15,10 @@ var testAuthURL = "http://localhost:14000/appauth"
 
 func TestAuthorizeCode(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAuthorizationRequest(ctx, req)
@@ -35,10 +35,10 @@ func TestAuthorizeCode(t *testing.T) {
 
 func TestAuthorizeCodeAccessDenied(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 
 	ctx := context.TODO()
 	resp, err := server.HandleHTTPAuthorizeRequest(
@@ -49,7 +49,7 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 	assertNisoError(
 		t,
 		err,
-		E_ACCESS_DENIED,
+		EAccessDenied,
 		"(access_denied) access denied",
 	)
 
@@ -67,7 +67,7 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 
 func TestAuthorizeRequestGenerationFailure(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
 	ctx := context.TODO()
@@ -81,14 +81,14 @@ func TestAuthorizeRequestGenerationFailure(t *testing.T) {
 	assertNisoError(
 		t,
 		err,
-		E_SERVER_ERROR,
+		EServerError,
 		"(server_error) fail",
 	)
 }
 
 func TestAuthorizeRequestGenerationFailureWithRequest(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
 	ctx := context.TODO()
@@ -96,7 +96,7 @@ func TestAuthorizeRequestGenerationFailureWithRequest(t *testing.T) {
 		ctx,
 		func() (*AuthorizationRequest, error) {
 			return &AuthorizationRequest{
-				ResponseType: CODE,
+				ResponseType: ResponseTypeCode,
 				ClientID:     "1234",
 			}, errors.New("fail")
 		},
@@ -105,7 +105,7 @@ func TestAuthorizeRequestGenerationFailureWithRequest(t *testing.T) {
 	assertNisoError(
 		t,
 		err,
-		E_SERVER_ERROR,
+		EServerError,
 		"(server_error) fail",
 	)
 
@@ -122,10 +122,10 @@ func TestAuthorizeRequestGenerationFailureWithRequest(t *testing.T) {
 
 func TestAuthorizeInvalidClient(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 	req.Form.Set("client_id", "invalid")
 
 	ctx := context.TODO()
@@ -134,7 +134,7 @@ func TestAuthorizeInvalidClient(t *testing.T) {
 	assertNisoError(
 		t,
 		err,
-		E_UNAUTHORIZED_CLIENT,
+		EUnauthorizedClient,
 		"(unauthorized_client) could not find client: client not found",
 	)
 
@@ -145,10 +145,10 @@ func TestAuthorizeInvalidClient(t *testing.T) {
 
 func TestAuthorizeInvalidRedirectURI(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 	req.Form.Set("redirect_uri", "invalid")
 
 	ctx := context.TODO()
@@ -157,7 +157,7 @@ func TestAuthorizeInvalidRedirectURI(t *testing.T) {
 	assertNisoError(
 		t,
 		err,
-		E_INVALID_REQUEST,
+		EInvalidRequest,
 		"(invalid_request) specified redirect_uri not valid for the given client_id: no matching uri found in allowed uri list: http://localhost:14000/appauth / invalid",
 	)
 
@@ -171,7 +171,7 @@ func TestAuthorizeInvalidAuthorizeType(t *testing.T) {
 	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 
 	ctx := context.TODO()
 	_, err := server.GenerateAuthorizationRequest(ctx, req)
@@ -179,17 +179,17 @@ func TestAuthorizeInvalidAuthorizeType(t *testing.T) {
 	assertNisoError(
 		t,
 		err,
-		E_UNSUPPORTED_RESPONSE_TYPE,
+		EUnsupportedResponseType,
 		"(unsupported_response_type) request type not in server allowed authorize types",
 	)
 }
 
 func TestAuthorizeToken(t *testing.T) {
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{TOKEN}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeToken}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, TOKEN)
+	req := makeAuthorizeTestRequest(t, ResponseTypeToken)
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAuthorizationRequest(ctx, req)
@@ -208,7 +208,7 @@ func TestAuthorizeToken(t *testing.T) {
 func TestAuthorizeCodePKCERequired(t *testing.T) {
 	config := NewServerConfig()
 	config.RequirePKCEForPublicClients = true
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
 	// Public client returns an error
@@ -216,7 +216,7 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		req, err := http.NewRequest("GET", testAuthURL, nil)
 		require.NoError(t, err)
 		req.Form = make(url.Values)
-		req.Form.Set("response_type", string(CODE))
+		req.Form.Set("response_type", string(ResponseTypeCode))
 		req.Form.Set("state", "a")
 		req.Form.Set("client_id", "public-client")
 
@@ -226,14 +226,14 @@ func TestAuthorizeCodePKCERequired(t *testing.T) {
 		assertNisoError(
 			t,
 			err,
-			E_INVALID_REQUEST,
+			EInvalidRequest,
 			"(invalid_request) code_challenge (rfc7636) required for public clients",
 		)
 	}
 
 	// Confidential client works without PKCE
 	{
-		req := makeAuthorizeTestRequest(t, CODE)
+		req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 
 		ctx := context.TODO()
 		ar, err := server.GenerateAuthorizationRequest(ctx, req)
@@ -253,10 +253,10 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	challenge := "12345678901234567890123456789012345678901234567890"
 
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 	req.Form.Set("code_challenge", challenge)
 
 	ctx := context.TODO()
@@ -276,17 +276,17 @@ func TestAuthorizeCodePKCEPlain(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, challenge, token.CodeChallenge)
-	assert.Equal(t, PKCE_PLAIN, token.CodeChallengeMethod)
+	assert.Equal(t, PKCEPlain, token.CodeChallengeMethod)
 }
 
 func TestAuthorizeCodePKCES256(t *testing.T) {
 	challenge := "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 	req.Form.Set("code_challenge", challenge)
 	req.Form.Set("code_challenge_method", "S256")
 
@@ -307,17 +307,17 @@ func TestAuthorizeCodePKCES256(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, challenge, token.CodeChallenge)
-	assert.Equal(t, PKCE_S256, token.CodeChallengeMethod)
+	assert.Equal(t, PKCES256, token.CodeChallengeMethod)
 }
 
 func TestAuthorizeCodeInvalidChallengeMethod(t *testing.T) {
 	challenge := "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 
 	config := NewServerConfig()
-	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{CODE}
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
 	server := newTestServer(config)
 
-	req := makeAuthorizeTestRequest(t, CODE)
+	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 	req.Form.Set("code_challenge", challenge)
 	req.Form.Set("code_challenge_method", "invalid")
 
@@ -327,7 +327,7 @@ func TestAuthorizeCodeInvalidChallengeMethod(t *testing.T) {
 	assertNisoError(
 		t,
 		err,
-		E_INVALID_REQUEST,
+		EInvalidRequest,
 		"(invalid_request) code_challenge_method transform algorithm not supported (rfc7636)",
 	)
 }

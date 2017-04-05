@@ -146,7 +146,7 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		config := NewServerConfig()
 		config.AllowedAccessTypes = AllowedAccessTypes{GrantTypeAuthorizationCode}
 		server := newTestServer(config)
-		server.Storage.SaveAuthorizeData(ctx, &AuthorizeData{
+		server.Storage.SaveAuthorizeData(ctx, &AuthorizationData{
 			ClientID:            "public-client",
 			Code:                "pkce-code",
 			ExpiresIn:           3600,

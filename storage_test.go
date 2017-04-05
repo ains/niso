@@ -9,7 +9,7 @@ import (
 
 type TestingStorage struct {
 	clients   map[string]*ClientData
-	authorize map[string]*AuthorizeData
+	authorize map[string]*AuthorizationData
 	access    map[string]*AccessData
 	refresh   map[string]*RefreshTokenData
 }
@@ -17,7 +17,7 @@ type TestingStorage struct {
 func NewTestingStorage() *TestingStorage {
 	r := &TestingStorage{
 		clients:   make(map[string]*ClientData),
-		authorize: make(map[string]*AuthorizeData),
+		authorize: make(map[string]*AuthorizationData),
 		access:    make(map[string]*AccessData),
 		refresh:   make(map[string]*RefreshTokenData),
 	}
@@ -33,7 +33,7 @@ func NewTestingStorage() *TestingStorage {
 		RedirectURI: "http://localhost:14000/appauth",
 	}
 
-	r.authorize["9999"] = &AuthorizeData{
+	r.authorize["9999"] = &AuthorizationData{
 		ClientID:    "1234",
 		Code:        "9999",
 		ExpiresIn:   3600,
@@ -67,12 +67,12 @@ func (s *TestingStorage) GetClientData(_ context.Context, id string) (*ClientDat
 	return nil, &NotFoundError{Err: errors.New("client not found")}
 }
 
-func (s *TestingStorage) SaveAuthorizeData(_ context.Context, data *AuthorizeData) error {
+func (s *TestingStorage) SaveAuthorizeData(_ context.Context, data *AuthorizationData) error {
 	s.authorize[data.Code] = data
 	return nil
 }
 
-func (s *TestingStorage) GetAuthorizeData(_ context.Context, code string) (*AuthorizeData, error) {
+func (s *TestingStorage) GetAuthorizeData(_ context.Context, code string) (*AuthorizationData, error) {
 	if d, ok := s.authorize[code]; ok {
 		return d, nil
 	}
@@ -112,7 +112,7 @@ type TestingAuthorizeTokenGen struct {
 	counter int64
 }
 
-func (a *TestingAuthorizeTokenGen) GenerateAuthorizeToken(data *AuthorizationRequest) (ret string, err error) {
+func (a *TestingAuthorizeTokenGen) GenerateAuthorizeToken(data *AuthorizationData) (ret string, err error) {
 	a.counter++
 	return strconv.FormatInt(a.counter, 10), nil
 }
@@ -122,12 +122,12 @@ type TestingAccessTokenGen struct {
 	rcounter int64
 }
 
-func (a *TestingAccessTokenGen) GenerateAccessToken(data *AccessRequest) (string, error) {
+func (a *TestingAccessTokenGen) GenerateAccessToken(data *AccessData) (string, error) {
 	a.acounter++
 	return strconv.FormatInt(a.acounter, 10), nil
 }
 
-func (a *TestingAccessTokenGen) GenerateRefreshToken(data *AccessRequest) (string, error) {
+func (a *TestingAccessTokenGen) GenerateRefreshToken(data *RefreshTokenData) (string, error) {
 	a.rcounter++
 	return "r" + strconv.FormatInt(a.rcounter, 10), nil
 }

@@ -11,7 +11,7 @@ type DefaultAuthorizeTokenGenerator struct {
 }
 
 // GenerateAuthorizeToken generates a base64-encoded UUID code
-func (a *DefaultAuthorizeTokenGenerator) GenerateAuthorizeToken(data *AuthorizationRequest) (string, error) {
+func (a *DefaultAuthorizeTokenGenerator) GenerateAuthorizeToken(data *AuthorizationData) (string, error) {
 	token := uuid.NewRandom()
 	return base64.RawURLEncoding.EncodeToString([]byte(token)), nil
 }
@@ -21,13 +21,13 @@ type DefaultAccessTokenGenerator struct {
 }
 
 // GenerateAccessToken generates base64-encoded UUID access and refresh tokens
-func (a *DefaultAccessTokenGenerator) GenerateAccessToken(ar *AccessRequest) (string, error) {
+func (a *DefaultAccessTokenGenerator) GenerateAccessToken(ar *AccessData) (string, error) {
 	token := uuid.NewRandom()
 	return base64.RawURLEncoding.EncodeToString([]byte(token)), nil
 }
 
 // GenerateRefreshToken generates base64-encoded UUID access and refresh tokens
-func (a *DefaultAccessTokenGenerator) GenerateRefreshToken(ar *AccessRequest) (string, error) {
+func (a *DefaultAccessTokenGenerator) GenerateRefreshToken(ar *RefreshTokenData) (string, error) {
 	token := uuid.NewRandom()
 	return base64.RawURLEncoding.EncodeToString([]byte(token)), nil
 }

@@ -30,7 +30,7 @@ type AccessRequest struct {
 	GrantType     GrantType
 	Code          string
 	ClientID      string
-	AuthorizeData *AuthorizeData
+	AuthorizeData *AuthorizationData
 
 	PreviousRefreshToken *RefreshTokenData
 
@@ -114,8 +114,8 @@ func (d *AccessData) ExpireAt() time.Time {
 
 // AccessTokenGenerator generates access tokens and refresh tokens
 type AccessTokenGenerator interface {
-	GenerateAccessToken(ar *AccessRequest) (accessToken string, err error)
-	GenerateRefreshToken(ar *AccessRequest) (refreshToken string, err error)
+	GenerateAccessToken(ar *AccessData) (string, error)
+	GenerateRefreshToken(ar *RefreshTokenData) (string, error)
 }
 
 // HandleHTTPAccessRequest is the main entry point for handling access requests.
@@ -400,7 +400,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	}
 
 	// generate access token
-	ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ar)
+	ret.AccessToken, err = s.AccessTokenGenerator.GenerateAccessToken(ret)
 	if err != nil {
 		return nil, NewWrappedError(EServerError, err, "failed to generate access token")
 	}
@@ -413,7 +413,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 			UserData:  ar.UserData,
 			Scope:     ar.Scope,
 		}
-		rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(ar)
+		rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(rt)
 		if err != nil {
 			return nil, NewWrappedError(EServerError, err, "failed to generate refresh token")
 		}

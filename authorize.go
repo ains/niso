@@ -57,8 +57,8 @@ type AuthorizationRequest struct {
 	UserData interface{}
 }
 
-// AuthorizeData represents an issued authorization code
-type AuthorizeData struct {
+// AuthorizationData represents an issued authorization code
+type AuthorizationData struct {
 	// ClientData information
 	ClientID string
 
@@ -90,18 +90,18 @@ type AuthorizeData struct {
 }
 
 // IsExpiredAt is true if authorization has expired by time 't'
-func (d *AuthorizeData) IsExpiredAt(t time.Time) bool {
+func (d *AuthorizationData) IsExpiredAt(t time.Time) bool {
 	return d.ExpireAt().Before(t)
 }
 
 // ExpireAt returns the expiration date
-func (d *AuthorizeData) ExpireAt() time.Time {
+func (d *AuthorizationData) ExpireAt() time.Time {
 	return d.CreatedAt.Add(time.Duration(d.ExpiresIn) * time.Second)
 }
 
 // AuthorizeTokenGenerator is the token generator interface
 type AuthorizeTokenGenerator interface {
-	GenerateAuthorizeToken(data *AuthorizationRequest) (string, error)
+	GenerateAuthorizeToken(data *AuthorizationData) (string, error)
 }
 
 // GenerateAuthorizationRequest handles authorization requests. Generates an AuthorizationRequest from a HTTP request.
@@ -311,7 +311,7 @@ func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 	resp.SetRedirectURL(ar.RedirectURI)
 
 	// generate authorization token
-	ret := &AuthorizeData{
+	ret := &AuthorizationData{
 		ClientID:    ar.ClientID,
 		CreatedAt:   s.Now(),
 		ExpiresIn:   ar.Expiration,
@@ -325,7 +325,7 @@ func (s *Server) finishAuthorizeRequest(ctx context.Context, ar *AuthorizationRe
 	}
 
 	// generate token code
-	code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ar)
+	code, err := s.AuthorizeTokenGenerator.GenerateAuthorizeToken(ret)
 	if err != nil {
 		return nil, NewWrappedError(EServerError, err, "failed to generate authorize token")
 

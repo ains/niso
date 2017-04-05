@@ -146,7 +146,7 @@ func newOAuthConfig(authURL string, tokenURL string) *oauth2.Config {
 func newIntegrationTestStorage() Storage {
 	r := &TestingStorage{
 		clients:   make(map[string]*ClientData),
-		authorize: make(map[string]*AuthorizeData),
+		authorize: make(map[string]*AuthorizationData),
 		access:    make(map[string]*AccessData),
 		refresh:   make(map[string]*RefreshTokenData),
 	}
@@ -157,7 +157,7 @@ func newIntegrationTestStorage() Storage {
 		RedirectURI:  redirectURI,
 	}
 
-	r.authorize[testAuthCode] = &AuthorizeData{
+	r.authorize[testAuthCode] = &AuthorizationData{
 		ClientID:    clientID,
 		Code:        testAuthCode,
 		ExpiresIn:   3600,

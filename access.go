@@ -27,10 +27,9 @@ type AccessRequestAuthorizedCallback func(ar *AccessRequest) (bool, error)
 
 // AccessRequest is a request for access tokens
 type AccessRequest struct {
-	GrantType     GrantType
-	Code          string
-	ClientID      string
-	AuthorizeData *AuthorizationData
+	GrantType GrantType
+	Code      string
+	ClientID  string
 
 	RefreshToken string
 
@@ -192,23 +191,23 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	}
 
 	// must be a valid authorization code
-	ret.AuthorizeData, err = s.Storage.GetAuthorizeData(ctx, ret.Code)
+	authorizeData, err := s.Storage.GetAuthorizeData(ctx, ret.Code)
 	if err != nil {
 		return nil, NewWrappedError(EInvalidGrant, err, "could not load data for authorization code")
 	}
 
 	// authorization code must be from the client id of current request
-	if ret.AuthorizeData.ClientID != ret.ClientID {
+	if authorizeData.ClientID != ret.ClientID {
 		return nil, NewError(EInvalidGrant, "invalid client id for authorization code")
 	}
 
 	// authorization code must not be expired
-	if ret.AuthorizeData.IsExpiredAt(s.Now()) {
+	if authorizeData.IsExpiredAt(s.Now()) {
 		return nil, NewError(EInvalidGrant, "authorization code expired")
 	}
 
 	// Verify PKCE, if present in the authorization data
-	if len(ret.AuthorizeData.CodeChallenge) > 0 {
+	if len(authorizeData.CodeChallenge) > 0 {
 		// https://tools.ietf.org/html/rfc7636#section-4.1
 		if matched := pkceMatcher.MatchString(ret.CodeVerifier); !matched {
 			return nil, NewError(EInvalidRequest, "code_verifier invalid (rfc7636)")
@@ -216,7 +215,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 
 		// https: //tools.ietf.org/html/rfc7636#section-4.6
 		codeVerifier := ""
-		switch ret.AuthorizeData.CodeChallengeMethod {
+		switch authorizeData.CodeChallengeMethod {
 		case "", PKCEPlain:
 			codeVerifier = ret.CodeVerifier
 		case PKCES256:
@@ -225,14 +224,14 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 		default:
 			return nil, NewError(EInvalidRequest, "code_challenge_method transform algorithm not supported (rfc7636)")
 		}
-		if codeVerifier != ret.AuthorizeData.CodeChallenge {
+		if codeVerifier != authorizeData.CodeChallenge {
 			return nil, NewError(EInvalidGrant, "code_verifier failed comparison with code_challenge")
 		}
 	}
 
 	// set rest of data
-	ret.Scope = ret.AuthorizeData.Scope
-	ret.UserData = ret.AuthorizeData.UserData
+	ret.Scope = authorizeData.Scope
+	ret.UserData = authorizeData.UserData
 
 	return ret, nil
 }
@@ -426,8 +425,8 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	}
 
 	// remove authorization token
-	if ar.AuthorizeData != nil {
-		s.Storage.DeleteAuthorizeData(ctx, ar.AuthorizeData.Code)
+	if ar.GrantType == GrantTypeAuthorizationCode && ar.Code != "" {
+		s.Storage.DeleteAuthorizeData(ctx, ar.Code)
 	}
 
 	// remove previous access token

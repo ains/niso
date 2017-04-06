@@ -25,6 +25,19 @@ const (
 	EInvalidClient           ErrorCode = "invalid_client"
 )
 
+var defaultErrorMessages map[ErrorCode]string = map[ErrorCode]string{
+	EInvalidRequest:          "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.",
+	EUnauthorizedClient:      "The client is not authorized to request a token using this method.",
+	EAccessDenied:            "The resource owner or authorization server denied the request.",
+	EUnsupportedResponseType: "The authorization server does not support obtaining a token using this method.",
+	EInvalidScope:            "The requested scope is invalid, unknown, or malformed.",
+	EServerError:             "The authorization server encountered an unexpected condition that prevented it from fulfilling the request.",
+	ETemporarilyUnavailable:  "The authorization server is currently unable to handle the request due to a temporary overloading or maintenance of the server.",
+	EUnsupportedGrantType:    "The authorization grant type is not supported by the authorization server.",
+	EInvalidGrant:            "The provided authorization grant (e.g., authorization code, resource owner credentials) or refresh token is invalid, expired, revoked, does not match the redirection URI used in the authorization request, or was issued to another client.",
+	EInvalidClient:           "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).",
+}
+
 // Error is a wrapper around an existing error with an OAuth2 error code
 type Error struct {
 	Code ErrorCode
@@ -70,7 +83,11 @@ func (e *Error) SetState(state string) {
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprintf("(%s) %s", e.Code, e.Err.Error())
+	errorMessage := e.Err.Error()
+	if errorMessage == "" {
+		return fmt.Sprintf("(%s)", e.Code)
+	}
+	return fmt.Sprintf("(%s) %s", e.Code, errorMessage)
 }
 
 // AsResponse creates a response object from this error, containing it's body or a redirect if specified
@@ -125,9 +142,14 @@ func (e *Error) GetRedirectURI() (string, error) {
 
 // GetResponseDict returns the fields for an error response as defined in https://tools.ietf.org/html/rfc6749#section-4.2.2.1
 func (e *Error) GetResponseDict() map[string]string {
+	desc := e.Message
+	if defaultMessage, ok := defaultErrorMessages[e.Code]; desc == "" && ok {
+		desc = defaultMessage
+	}
+
 	return map[string]string{
 		"error":             string(e.Code),
-		"error_description": e.Message,
+		"error_description": desc,
 		"state":             e.state,
 	}
 }

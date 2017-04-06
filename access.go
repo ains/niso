@@ -139,7 +139,7 @@ func (s *Server) HandleHTTPAccessRequest(ctx context.Context, r *http.Request, i
 	}
 
 	if !isAuthorized {
-		err = NewError(EAccessDenied, "access denied")
+		err = NewError(EAccessDenied, "")
 		return toInternalError(err).AsResponse(), err
 	}
 

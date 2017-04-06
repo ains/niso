@@ -77,6 +77,7 @@ func TestAuthorizeRequestGenerationFailure(t *testing.T) {
 			return nil, errors.New("fail")
 		},
 		func(_ *AuthorizationRequest) (bool, error) { return false, nil },
+		func(_ *AuthorizationRequest, _ *Response) error { return nil },
 	)
 	assertNisoError(
 		t,
@@ -101,6 +102,7 @@ func TestAuthorizeRequestGenerationFailureWithRequest(t *testing.T) {
 			}, errors.New("fail")
 		},
 		func(_ *AuthorizationRequest) (bool, error) { return false, nil },
+		func(_ *AuthorizationRequest, _ *Response) error { return nil },
 	)
 	assertNisoError(
 		t,
@@ -203,6 +205,37 @@ func TestAuthorizeToken(t *testing.T) {
 	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
 	assert.True(t, resp.redirectInFragment, "response should be a redirect with fragment")
 	assert.Equal(t, "1", resp.Data["access_token"], "incorrect access_token")
+}
+
+func TestAuthorizeRequestOnSuccessError(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAuthorizeTypes = AllowedAuthorizeTypes{ResponseTypeCode}
+	server := newTestServer(config)
+
+	ctx := context.TODO()
+	resp, err := server.HandleAuthorizeRequest(
+		ctx,
+		func() (*AuthorizationRequest, error) {
+			return &AuthorizationRequest{
+				ResponseType: ResponseTypeCode,
+				ClientID:     "1234",
+			}, nil
+		},
+		func(_ *AuthorizationRequest) (bool, error) { return true, nil },
+		func(_ *AuthorizationRequest, _ *Response) error { return errors.New("fail") },
+	)
+	assertNisoError(
+		t,
+		err,
+		EServerError,
+		"(server_error) fail",
+	)
+
+	respRedirectURI, err := resp.GetRedirectURL()
+	require.NoError(t, err)
+
+	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
+	assert.Equal(t, "http://localhost:14000/appauth?error=server_error&error_description=fail", respRedirectURI)
 }
 
 func TestAuthorizeCodePKCERequired(t *testing.T) {

@@ -33,6 +33,10 @@ var (
 // errors returned by this function will result in internal server errors being returned
 type AuthRequestAuthorizedCallback func(ar *AuthorizationRequest) (bool, error)
 
+// OnAuthSuccessCallback is called after an authorize request is successful to allow any final manipulation of the
+// response, whilst still having errors captures and handled as per the OAuth spec.
+type OnAuthSuccessCallback func(ar *AuthorizationRequest, resp *Response) error
+
 // AuthRequestGenerator generates and returns an AuthorizationRequest to process or an error.
 type AuthRequestGenerator func() (*AuthorizationRequest, error)
 
@@ -213,6 +217,9 @@ func (s *Server) HandleHTTPAuthorizeRequest(ctx context.Context, r *http.Request
 			return authorizationRequestFromHTTPRequest(r), nil
 		},
 		isAuthorizedCb,
+		func(_ *AuthorizationRequest, _ *Response) error {
+			return nil
+		},
 	)
 }
 
@@ -220,7 +227,12 @@ func (s *Server) HandleHTTPAuthorizeRequest(ctx context.Context, r *http.Request
 // It can take a method which generates the AuthRequest struct to use for the authorization
 // This method will always return a Response, even if there was an error processing the request, which should be
 // rendered for a user. It may also return an error in the second argument which can be logged by the caller.
-func (s *Server) HandleAuthorizeRequest(ctx context.Context, f AuthRequestGenerator, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
+func (s *Server) HandleAuthorizeRequest(
+	ctx context.Context,
+	f AuthRequestGenerator,
+	isAuthorizedCb AuthRequestAuthorizedCallback,
+	onSuccessCb OnAuthSuccessCallback,
+) (*Response, error) {
 	ar, err := f()
 	if err != nil {
 		err = toInternalError(err)
@@ -264,6 +276,11 @@ func (s *Server) HandleAuthorizeRequest(ctx context.Context, f AuthRequestGenera
 
 	resp, err := s.FinishAuthorizeRequest(ctx, ar)
 	if err != nil {
+		return toInternalError(err).AsResponse(), err
+	}
+
+	if err := onSuccessCb(ar, resp); err != nil {
+		err = errorWithRedirect(ar, err)
 		return toInternalError(err).AsResponse(), err
 	}
 

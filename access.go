@@ -32,7 +32,7 @@ type AccessRequest struct {
 	ClientID      string
 	AuthorizeData *AuthorizationData
 
-	PreviousRefreshToken *RefreshTokenData
+	RefreshToken string
 
 	RedirectURI   string
 	Scope         string
@@ -276,7 +276,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	req := &AccessRequest{
 		ClientID:        auth.Username,
 		GrantType:       GrantTypeRefreshToken,
-		Code:            r.FormValue("refresh_token"),
+		RefreshToken:    r.FormValue("refresh_token"),
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
@@ -284,29 +284,29 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	// "refresh_token" is required
-	if req.Code == "" {
+	if req.RefreshToken == "" {
 		return nil, NewError(EInvalidGrant, "no refresh token provided")
 	}
 
 	// must be a valid refresh code
-	req.PreviousRefreshToken, err = s.Storage.GetRefreshTokenData(ctx, req.Code)
+	previousRefreshToken, err := s.Storage.GetRefreshTokenData(ctx, req.RefreshToken)
 	if err != nil {
 		return nil, NewWrappedError(EInvalidGrant, err, "failed to get refresh token data from storage")
 	}
 
 	// client must be the same as the previous token
-	if req.PreviousRefreshToken.ClientID != req.ClientID {
+	if previousRefreshToken.ClientID != req.ClientID {
 		return nil, NewError(EInvalidClient, "request client id must be the same from previous token")
 	}
 
 	// set rest of data
-	req.RedirectURI = req.PreviousRefreshToken.RedirectURI
-	req.UserData = req.PreviousRefreshToken.UserData
+	req.RedirectURI = previousRefreshToken.RedirectURI
+	req.UserData = previousRefreshToken.UserData
 	if req.Scope == "" {
-		req.Scope = req.PreviousRefreshToken.Scope
+		req.Scope = previousRefreshToken.Scope
 	}
 
-	if extraScopes(req.PreviousRefreshToken.Scope, req.Scope) {
+	if extraScopes(previousRefreshToken.Scope, req.Scope) {
 		return nil, NewError(EAccessDenied, "the requested scope must not include any scope not originally granted by the resource owner")
 	}
 
@@ -438,8 +438,8 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	}
 
 	// remove previous access token
-	if ar.PreviousRefreshToken != nil {
-		s.Storage.DeleteRefreshTokenData(ctx, ar.PreviousRefreshToken.RefreshToken)
+	if ar.RefreshToken != "" {
+		s.Storage.DeleteRefreshTokenData(ctx, ar.RefreshToken)
 	}
 
 	// output data

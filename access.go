@@ -50,9 +50,6 @@ type AccessRequest struct {
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
 
-	// HTTPRequest *http.Request for special use
-	HTTPRequest *http.Request
-
 	// Optional code_verifier as described in rfc7636
 	CodeVerifier string
 }
@@ -187,7 +184,6 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 		CodeVerifier:    r.FormValue("code_verifier"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	// "code" is required
@@ -280,7 +276,6 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	// "refresh_token" is required
@@ -329,7 +324,6 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	// "username" and "password" is required
@@ -366,7 +360,6 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: false,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)

@@ -270,7 +270,7 @@ func (s *Server) HandleAuthorizeRequest(
 	}
 
 	if !isAuthorized {
-		err = errorWithRedirect(ar, NewError(EAccessDenied, "access denied"))
+		err = errorWithRedirect(ar, NewError(EAccessDenied, ""))
 		return toInternalError(err).AsResponse(), err
 	}
 

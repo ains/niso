@@ -50,18 +50,19 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 		t,
 		err,
 		EAccessDenied,
-		"(access_denied) access denied",
+		"(access_denied)",
 	)
 
+	expectedURL := "http://localhost:14000/appauth?error=access_denied&error_description=The+resource+owner+or+authorization+server+denied+the+request.&state=a"
 	redirectURI, err := err.(*Error).GetRedirectURI()
 	require.NoError(t, err)
-	assert.Equal(t, "http://localhost:14000/appauth?error=access_denied&error_description=access+denied&state=a", redirectURI)
+	assert.Equal(t, expectedURL, redirectURI)
 
 	respRedirectURI, err := resp.GetRedirectURL()
 	require.NoError(t, err)
 
 	assert.Equal(t, REDIRECT, resp.responseType, "response type should be a redirect")
-	assert.Equal(t, "http://localhost:14000/appauth?error=access_denied&error_description=access+denied&state=a", respRedirectURI)
+	assert.Equal(t, expectedURL, respRedirectURI)
 
 }
 
@@ -383,7 +384,7 @@ func makeAuthorizeTestRequest(t *testing.T, responseType AuthorizeResponseType) 
 }
 
 func assertNisoError(t *testing.T, err error, expectedCode ErrorCode, expectedMessage string) {
-	require.EqualError(
+	assert.EqualError(
 		t,
 		err,
 		expectedMessage,

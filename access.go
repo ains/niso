@@ -27,12 +27,11 @@ type AccessRequestAuthorizedCallback func(ar *AccessRequest) (bool, error)
 
 // AccessRequest is a request for access tokens
 type AccessRequest struct {
-	GrantType     GrantType
-	Code          string
-	ClientID      string
-	AuthorizeData *AuthorizationData
+	GrantType GrantType
+	Code      string
+	ClientID  string
 
-	PreviousRefreshToken *RefreshTokenData
+	RefreshToken string
 
 	RedirectURI   string
 	Scope         string
@@ -49,9 +48,6 @@ type AccessRequest struct {
 
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
-
-	// HTTPRequest *http.Request for special use
-	HTTPRequest *http.Request
 
 	// Optional code_verifier as described in rfc7636
 	CodeVerifier string
@@ -77,6 +73,9 @@ type AccessData struct {
 	// Date created
 	CreatedAt time.Time
 
+	// Type of grant used to issue this token
+	GrantedVia GrantType
+
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
 }
@@ -97,6 +96,12 @@ type RefreshTokenData struct {
 
 	// Scope requested for this refresh token
 	Scope string
+
+	// Previous refresh token (if one existed)
+	PreviousRefreshToken string
+
+	// Type of grant used to issue this token
+	GrantedVia GrantType
 
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
@@ -187,7 +192,6 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 		CodeVerifier:    r.FormValue("code_verifier"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	// "code" is required
@@ -196,23 +200,23 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	}
 
 	// must be a valid authorization code
-	ret.AuthorizeData, err = s.Storage.GetAuthorizeData(ctx, ret.Code)
+	authorizeData, err := s.Storage.GetAuthorizeData(ctx, ret.Code)
 	if err != nil {
 		return nil, NewWrappedError(EInvalidGrant, err, "could not load data for authorization code")
 	}
 
 	// authorization code must be from the client id of current request
-	if ret.AuthorizeData.ClientID != ret.ClientID {
+	if authorizeData.ClientID != ret.ClientID {
 		return nil, NewError(EInvalidGrant, "invalid client id for authorization code")
 	}
 
 	// authorization code must not be expired
-	if ret.AuthorizeData.IsExpiredAt(s.Now()) {
+	if authorizeData.IsExpiredAt(s.Now()) {
 		return nil, NewError(EInvalidGrant, "authorization code expired")
 	}
 
 	// Verify PKCE, if present in the authorization data
-	if len(ret.AuthorizeData.CodeChallenge) > 0 {
+	if len(authorizeData.CodeChallenge) > 0 {
 		// https://tools.ietf.org/html/rfc7636#section-4.1
 		if matched := pkceMatcher.MatchString(ret.CodeVerifier); !matched {
 			return nil, NewError(EInvalidRequest, "code_verifier invalid (rfc7636)")
@@ -220,7 +224,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 
 		// https: //tools.ietf.org/html/rfc7636#section-4.6
 		codeVerifier := ""
-		switch ret.AuthorizeData.CodeChallengeMethod {
+		switch authorizeData.CodeChallengeMethod {
 		case "", PKCEPlain:
 			codeVerifier = ret.CodeVerifier
 		case PKCES256:
@@ -229,14 +233,14 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 		default:
 			return nil, NewError(EInvalidRequest, "code_challenge_method transform algorithm not supported (rfc7636)")
 		}
-		if codeVerifier != ret.AuthorizeData.CodeChallenge {
+		if codeVerifier != authorizeData.CodeChallenge {
 			return nil, NewError(EInvalidGrant, "code_verifier failed comparison with code_challenge")
 		}
 	}
 
 	// set rest of data
-	ret.Scope = ret.AuthorizeData.Scope
-	ret.UserData = ret.AuthorizeData.UserData
+	ret.Scope = authorizeData.Scope
+	ret.UserData = authorizeData.UserData
 
 	return ret, nil
 }
@@ -276,37 +280,36 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	req := &AccessRequest{
 		ClientID:        auth.Username,
 		GrantType:       GrantTypeRefreshToken,
-		Code:            r.FormValue("refresh_token"),
+		RefreshToken:    r.FormValue("refresh_token"),
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	// "refresh_token" is required
-	if req.Code == "" {
+	if req.RefreshToken == "" {
 		return nil, NewError(EInvalidGrant, "no refresh token provided")
 	}
 
 	// must be a valid refresh code
-	req.PreviousRefreshToken, err = s.Storage.GetRefreshTokenData(ctx, req.Code)
+	previousRefreshToken, err := s.Storage.GetRefreshTokenData(ctx, req.RefreshToken)
 	if err != nil {
 		return nil, NewWrappedError(EInvalidGrant, err, "failed to get refresh token data from storage")
 	}
 
 	// client must be the same as the previous token
-	if req.PreviousRefreshToken.ClientID != req.ClientID {
+	if previousRefreshToken.ClientID != req.ClientID {
 		return nil, NewError(EInvalidClient, "request client id must be the same from previous token")
 	}
 
 	// set rest of data
-	req.RedirectURI = req.PreviousRefreshToken.RedirectURI
-	req.UserData = req.PreviousRefreshToken.UserData
+	req.RedirectURI = previousRefreshToken.RedirectURI
+	req.UserData = previousRefreshToken.UserData
 	if req.Scope == "" {
-		req.Scope = req.PreviousRefreshToken.Scope
+		req.Scope = previousRefreshToken.Scope
 	}
 
-	if extraScopes(req.PreviousRefreshToken.Scope, req.Scope) {
+	if extraScopes(previousRefreshToken.Scope, req.Scope) {
 		return nil, NewError(EAccessDenied, "the requested scope must not include any scope not originally granted by the resource owner")
 	}
 
@@ -329,7 +332,6 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	// "username" and "password" is required
@@ -366,7 +368,6 @@ func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Req
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: false,
 		Expiration:      s.Config.AccessExpiration,
-		HTTPRequest:     r,
 	}
 
 	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
@@ -397,6 +398,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		ExpiresIn:   ar.Expiration,
 		UserData:    ar.UserData,
 		Scope:       ar.Scope,
+		GrantedVia:  ar.GrantType,
 	}
 
 	// generate access token
@@ -408,10 +410,12 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	if ar.GenerateRefresh {
 		// Generate Refresh Token
 		rt := &RefreshTokenData{
-			ClientID:  ar.ClientID,
-			CreatedAt: s.Now(),
-			UserData:  ar.UserData,
-			Scope:     ar.Scope,
+			ClientID:             ar.ClientID,
+			CreatedAt:            s.Now(),
+			UserData:             ar.UserData,
+			Scope:                ar.Scope,
+			PreviousRefreshToken: ar.RefreshToken,
+			GrantedVia:           ar.GrantType,
 		}
 		rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(rt)
 		if err != nil {
@@ -433,13 +437,13 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	}
 
 	// remove authorization token
-	if ar.AuthorizeData != nil {
-		s.Storage.DeleteAuthorizeData(ctx, ar.AuthorizeData.Code)
+	if ar.GrantType == GrantTypeAuthorizationCode && ar.Code != "" {
+		s.Storage.DeleteAuthorizeData(ctx, ar.Code)
 	}
 
 	// remove previous access token
-	if ar.PreviousRefreshToken != nil {
-		s.Storage.DeleteRefreshTokenData(ctx, ar.PreviousRefreshToken.RefreshToken)
+	if ar.RefreshToken != "" {
+		s.Storage.DeleteRefreshTokenData(ctx, ar.RefreshToken)
 	}
 
 	// output data

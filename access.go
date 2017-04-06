@@ -94,6 +94,9 @@ type RefreshTokenData struct {
 	// Scope requested for this refresh token
 	Scope string
 
+	// Previous refresh token (if one existed)
+	PreviousRefreshToken string
+
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
 }
@@ -400,10 +403,11 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 	if ar.GenerateRefresh {
 		// Generate Refresh Token
 		rt := &RefreshTokenData{
-			ClientID:  ar.ClientID,
-			CreatedAt: s.Now(),
-			UserData:  ar.UserData,
-			Scope:     ar.Scope,
+			ClientID:             ar.ClientID,
+			CreatedAt:            s.Now(),
+			UserData:             ar.UserData,
+			Scope:                ar.Scope,
+			PreviousRefreshToken: ar.RefreshToken,
 		}
 		rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(rt)
 		if err != nil {

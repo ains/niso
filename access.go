@@ -73,6 +73,9 @@ type AccessData struct {
 	// Date created
 	CreatedAt time.Time
 
+	// Type of grant used to issue this token
+	GrantedVia GrantType
+
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
 }
@@ -96,6 +99,9 @@ type RefreshTokenData struct {
 
 	// Previous refresh token (if one existed)
 	PreviousRefreshToken string
+
+	// Type of grant used to issue this token
+	GrantedVia GrantType
 
 	// Data to be passed to storage. Not used by the library.
 	UserData interface{}
@@ -392,6 +398,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 		ExpiresIn:   ar.Expiration,
 		UserData:    ar.UserData,
 		Scope:       ar.Scope,
+		GrantedVia:  ar.GrantType,
 	}
 
 	// generate access token
@@ -408,6 +415,7 @@ func (s *Server) FinishAccessRequest(ctx context.Context, ar *AccessRequest) (*R
 			UserData:             ar.UserData,
 			Scope:                ar.Scope,
 			PreviousRefreshToken: ar.RefreshToken,
+			GrantedVia:           ar.GrantType,
 		}
 		rt.RefreshToken, err = s.AccessTokenGenerator.GenerateRefreshToken(rt)
 		if err != nil {

@@ -25,7 +25,7 @@ const (
 	EInvalidClient           ErrorCode = "invalid_client"
 )
 
-var defaultErrorMessages map[ErrorCode]string = map[ErrorCode]string{
+var defaultErrorMessages = map[ErrorCode]string{
 	EInvalidRequest:          "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.",
 	EUnauthorizedClient:      "The client is not authorized to request a token using this method.",
 	EAccessDenied:            "The resource owner or authorization server denied the request.",

@@ -285,7 +285,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	}
 
 	if previousRefreshToken.RedirectURI != req.RedirectURI {
-		return nil, NewError(EInvalidGrant, "invalid redirection uri for refresh token")
+		return nil, NewError(EInvalidGrant, "request redirect uri must be the same as the one used to issue the refresh token")
 	}
 
 	// set rest of data

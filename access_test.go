@@ -45,7 +45,7 @@ func TestAccessAuthorizationCode_WrongRedirectURI(t *testing.T) {
 
 	ctx := context.TODO()
 	_, err := server.GenerateAccessRequest(ctx, req)
-	require.Error(t, err)
+	assertNisoError(t, err, EInvalidGrant, "(invalid_grant) invalid redirection uri for authorization code")
 }
 
 func TestAccessRefreshToken(t *testing.T) {

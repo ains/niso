@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 
@@ -14,10 +13,7 @@ func main() {
 
 	// Authorization code endpoint
 	http.HandleFunc("/authorize", func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.TODO()
-
 		resp, err := server.HandleHTTPAuthorizeRequest(
-			ctx,
 			r,
 			func(ar *niso.AuthorizationRequest) (bool, error) {
 				return true, nil
@@ -32,10 +28,7 @@ func main() {
 
 	// Access token endpoint
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.TODO()
-
 		resp, err := server.HandleHTTPAccessRequest(
-			ctx,
 			r,
 			func(ar *niso.AccessRequest) (bool, error) {
 				return true, nil

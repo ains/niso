@@ -210,9 +210,9 @@ func errorWithRedirect(ar *AuthorizationRequest, err error) error {
 // HandleHTTPAuthorizeRequest is the main entry point for handling authorization requests.
 // This method will always return a Response, even if there was an error processing the request, which should be
 // rendered for a user. It may also return an error in the second argument which can be logged by the caller.
-func (s *Server) HandleHTTPAuthorizeRequest(ctx context.Context, r *http.Request, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
+func (s *Server) HandleHTTPAuthorizeRequest(r *http.Request, isAuthorizedCb AuthRequestAuthorizedCallback) (*Response, error) {
 	return s.HandleAuthorizeRequest(
-		ctx,
+		r.Context(),
 		func() (*AuthorizationRequest, error) {
 			return authorizationRequestFromHTTPRequest(r), nil
 		},

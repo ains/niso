@@ -63,9 +63,7 @@ func TestAccessPassword(t *testing.T) {
 	req.Form.Set("password", "testing")
 	req.Form.Set("state", "a")
 
-	ctx := context.TODO()
 	resp, err := server.HandleHTTPAccessRequest(
-		ctx,
 		req,
 		func(ar *AccessRequest) (bool, error) {
 			return ar.Username == "testing" && ar.Password == "testing", nil

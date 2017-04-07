@@ -34,10 +34,7 @@ func (s *NisoIntegrationTestSuite) SetupSuite() {
 	server.Storage = newIntegrationTestStorage()
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.TODO()
-
 		resp, err := server.HandleHTTPAuthorizeRequest(
-			ctx,
 			r,
 			func(_ *AuthorizationRequest) (bool, error) { return true, nil },
 		)
@@ -50,9 +47,7 @@ func (s *NisoIntegrationTestSuite) SetupSuite() {
 	s.testAuthorizeURL = authServer.URL
 
 	accessServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.TODO()
 		resp, err := server.HandleHTTPAccessRequest(
-			ctx,
 			r,
 			func(_ *AccessRequest) (bool, error) { return true, nil },
 		)

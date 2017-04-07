@@ -153,40 +153,46 @@ func (s *Server) HandleHTTPAccessRequest(r *http.Request, isAuthorizedCb AccessR
 
 // GenerateAccessRequest generates an AccessRequest from a HTTP request.
 func (s *Server) GenerateAccessRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
-	// Only allow GET (when AllowGetAccessRequest set) or POST
+	// Only allow GET (when AllowGetAccessRequest set) or POST.
 	if r.Method == "GET" && !s.Config.AllowGetAccessRequest {
 		return nil, NewError(EInvalidRequest, "GET method not allowed for access requests")
 	} else if r.Method != "POST" {
 		return nil, NewError(EInvalidRequest, "access requests must POST verb")
 	}
 
+	// Get client authentication.
+	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
+	if err != nil {
+		return nil, err
+	}
+
+	// Grab client data from storage and validate.
+	client, err := getClientDataAndValidate(ctx, auth, s.Storage)
+	if err != nil {
+		return nil, err
+	}
+
 	grantType := GrantType(r.FormValue("grant_type"))
 	if s.Config.AllowedAccessTypes.Exists(grantType) {
 		switch grantType {
 		case GrantTypeAuthorizationCode:
-			return s.handleAuthorizationCodeRequest(ctx, r)
+			return s.handleAuthorizationCodeRequest(ctx, r, client)
 		case GrantTypeRefreshToken:
-			return s.handleRefreshTokenRequest(ctx, r)
+			return s.handleRefreshTokenRequest(ctx, r, client)
 		case GrantTypePassword:
-			return s.handlePasswordRequest(ctx, r)
+			return s.handlePasswordRequest(ctx, r, client)
 		case GrantTypeClientCredentials:
-			return s.handleClientCredentialsRequest(ctx, r)
+			return s.handleClientCredentialsRequest(ctx, r, client)
 		}
 	}
 
 	return nil, NewError(EUnsupportedGrantType, "unsupported grant type")
 }
 
-func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
-	// get client authentication
-	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
-	if err != nil {
-		return nil, NewWrappedError(EInvalidRequest, err, "failed to get client authentication")
-	}
-
+func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Request, client *ClientData) (*AccessRequest, error) {
 	// generate access token
 	ret := &AccessRequest{
-		ClientID:        auth.Username,
+		ClientID:        client.ClientID,
 		GrantType:       GrantTypeAuthorizationCode,
 		RedirectURI:     r.FormValue("redirect_uri"),
 		Code:            r.FormValue("code"),
@@ -250,16 +256,10 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	return ret, nil
 }
 
-func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
-	// get client authentication
-	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request, client *ClientData) (*AccessRequest, error) {
 	// generate access token
 	req := &AccessRequest{
-		ClientID:        auth.Username,
+		ClientID:        client.ClientID,
 		GrantType:       GrantTypeRefreshToken,
 		RedirectURI:     r.FormValue("redirect_uri"),
 		RefreshToken:    r.FormValue("refresh_token"),
@@ -302,16 +302,10 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	return req, nil
 }
 
-func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
-	// get client authentication
-	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request, client *ClientData) (*AccessRequest, error) {
 	// generate access token
 	ret := &AccessRequest{
-		ClientID:        auth.Username,
+		ClientID:        client.ClientID,
 		GrantType:       GrantTypePassword,
 		Username:        r.FormValue("username"),
 		Password:        r.FormValue("password"),
@@ -328,41 +322,24 @@ func (s *Server) handlePasswordRequest(ctx context.Context, r *http.Request) (*A
 		return nil, NewError(EInvalidGrant, "password field not set")
 	}
 
-	// must have a valid client
-	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
-	if err != nil {
-		return nil, err
-	}
-
 	// set redirect uri
-	ret.RedirectURI = firstURI(clientData.RedirectURI, s.Config.RedirectURISeparator)
+	ret.RedirectURI = firstURI(client.RedirectURI, s.Config.RedirectURISeparator)
 
 	return ret, nil
 }
 
-func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
-	// get client authentication
-	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Server) handleClientCredentialsRequest(ctx context.Context, r *http.Request, client *ClientData) (*AccessRequest, error) {
 	// generate access token
 	ret := &AccessRequest{
-		ClientID:        auth.Username,
+		ClientID:        client.ClientID,
 		GrantType:       GrantTypeClientCredentials,
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: false,
 		Expiration:      s.Config.AccessExpiration,
 	}
 
-	clientData, err := getClientDataFromBasicAuth(ctx, auth, s.Storage)
-	if err != nil {
-		return nil, err
-	}
-
 	// set redirect uri
-	ret.RedirectURI = firstURI(clientData.RedirectURI, s.Config.RedirectURISeparator)
+	ret.RedirectURI = firstURI(client.RedirectURI, s.Config.RedirectURISeparator)
 
 	return ret, nil
 }

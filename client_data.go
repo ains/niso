@@ -15,8 +15,8 @@ func (c *ClientData) ValidSecret(secret string) bool {
 	return secret == c.ClientSecret
 }
 
-// getClientDataFromBasicAuth looks up and authenticates the basic auth using the given storage.
-func getClientDataFromBasicAuth(ctx context.Context, auth *BasicAuth, storage Storage) (*ClientData, error) {
+// getClientDataAndValidate looks up and authenticates the basic auth using the given storage.
+func getClientDataAndValidate(ctx context.Context, auth *BasicAuth, storage Storage) (*ClientData, error) {
 	clientData, err := getClientData(ctx, auth.Username, storage)
 	if err != nil {
 		return nil, err

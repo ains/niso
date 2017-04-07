@@ -126,7 +126,8 @@ type AccessTokenGenerator interface {
 // HandleHTTPAccessRequest is the main entry point for handling access requests.
 // This method will always return a Response, even if there was an error processing the request, which should be
 // rendered for a user. It may also return an error in the second argument which can be logged by the caller.
-func (s *Server) HandleHTTPAccessRequest(ctx context.Context, r *http.Request, isAuthorizedCb AccessRequestAuthorizedCallback) (*Response, error) {
+func (s *Server) HandleHTTPAccessRequest(r *http.Request, isAuthorizedCb AccessRequestAuthorizedCallback) (*Response, error) {
+	ctx := r.Context()
 	ar, err := s.GenerateAccessRequest(ctx, r)
 	if err != nil {
 		return toInternalError(err).AsResponse(), err

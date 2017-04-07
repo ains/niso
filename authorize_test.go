@@ -40,9 +40,7 @@ func TestAuthorizeCodeAccessDenied(t *testing.T) {
 
 	req := makeAuthorizeTestRequest(t, ResponseTypeCode)
 
-	ctx := context.TODO()
 	resp, err := server.HandleHTTPAuthorizeRequest(
-		ctx,
 		req,
 		func(_ *AuthorizationRequest) (bool, error) { return false, nil },
 	)

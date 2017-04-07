@@ -19,6 +19,7 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	req := makeTestRequest(t, GrantTypeAuthorizationCode)
 	req.Form.Set("code", "9999")
 	req.Form.Set("state", "a")
+	req.Form.Set("redirect_uri", "http://localhost:14000/appauth")
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
@@ -30,6 +31,21 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	assert.Equal(t, DATA, resp.responseType)
 	assert.Equal(t, "1", resp.Data["access_token"])
 	assert.Equal(t, "r1", resp.Data["refresh_token"])
+}
+
+func TestAccessAuthorizationCode_WrongRedirectURI(t *testing.T) {
+	config := NewServerConfig()
+	config.AllowedAccessTypes = AllowedAccessTypes{GrantTypeAuthorizationCode}
+	server := newTestServer(config)
+
+	req := makeTestRequest(t, GrantTypeAuthorizationCode)
+	req.Form.Set("code", "9999")
+	req.Form.Set("state", "a")
+	req.Form.Set("redirect_uri", "dsfgdsfg")
+
+	ctx := context.TODO()
+	_, err := server.GenerateAccessRequest(ctx, req)
+	require.Error(t, err)
 }
 
 func TestAccessRefreshToken(t *testing.T) {

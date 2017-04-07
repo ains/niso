@@ -99,15 +99,6 @@ func TestAccessClientCredentials(t *testing.T) {
 	assert.NotContains(t, resp.Data, "refresh_token")
 }
 
-func TestExtraScopes(t *testing.T) {
-	assert.False(t, extraScopes("", ""), "extraScopes returned true with empty scopes")
-	assert.False(t, extraScopes("a", ""), "extraScopes returned true with fewer scopes")
-	assert.False(t, extraScopes("a,b", "b,a"), "extraScopes returned true with matching scopes")
-
-	assert.True(t, extraScopes("a,b", "b,a,c"), "extraScopes returned false with extra scopes")
-	assert.True(t, extraScopes("", "b,a,c"), "extraScopes returned false with extra scopes")
-}
-
 func TestAccessAuthorizationCodePKCE(t *testing.T) {
 	testcases := map[string]struct {
 		Challenge       string

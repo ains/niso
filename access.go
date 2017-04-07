@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -245,30 +244,6 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	return ret, nil
 }
 
-func extraScopes(accessScopes, refreshScopes string) bool {
-	accessScopesLists := strings.Split(accessScopes, ",")
-	refreshScopesLists := strings.Split(refreshScopes, ",")
-
-	accessMaps := make(map[string]int)
-
-	for _, scope := range accessScopesLists {
-		if scope == "" {
-			continue
-		}
-		accessMaps[scope] = 1
-	}
-
-	for _, scope := range refreshScopesLists {
-		if scope == "" {
-			continue
-		}
-		if _, ok := accessMaps[scope]; !ok {
-			return true
-		}
-	}
-	return false
-}
-
 func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request) (*AccessRequest, error) {
 	// get client authentication
 	auth, err := getClientAuthFromRequest(r, s.Config.AllowClientSecretInParams)
@@ -309,8 +284,9 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 		req.Scope = previousRefreshToken.Scope
 	}
 
-	if extraScopes(previousRefreshToken.Scope, req.Scope) {
-		return nil, NewError(EAccessDenied, "the requested scope must not include any scope not originally granted by the resource owner")
+	req.Scope, err = s.AccessTokenSubScoper.CheckSubScopes(req.Scope, previousRefreshToken.Scope)
+	if err != nil {
+		return nil, NewError(EInvalidScope, "the requested scope must not include any scope not originally granted by the resource owner")
 	}
 
 	return req, nil

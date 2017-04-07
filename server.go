@@ -10,6 +10,7 @@ type Server struct {
 	Storage                 Storage
 	AuthorizeTokenGenerator AuthorizeTokenGenerator
 	AccessTokenGenerator    AccessTokenGenerator
+	AccessTokenSubScoper    AccessTokenSubScoper
 	Now                     func() time.Time
 }
 
@@ -20,6 +21,7 @@ func NewServer(config *ServerConfig, storage Storage) *Server {
 		Storage:                 storage,
 		AuthorizeTokenGenerator: &DefaultAuthorizeTokenGenerator{},
 		AccessTokenGenerator:    &DefaultAccessTokenGenerator{},
+		AccessTokenSubScoper:    &DefaultAccessTokenSubScoper{},
 		Now:                     time.Now,
 	}
 }

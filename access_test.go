@@ -19,7 +19,7 @@ func TestAccessAuthorizationCode(t *testing.T) {
 	req := makeTestRequest(t, GrantTypeAuthorizationCode)
 	req.Form.Set("code", "9999")
 	req.Form.Set("state", "a")
-	req.Form.Set("redirect_uri", "http://localhost:14000/appauth")
+	req.Form.Set("redirect_uri", testAuthURL)
 
 	ctx := context.TODO()
 	ar, err := server.GenerateAccessRequest(ctx, req)
@@ -166,6 +166,7 @@ func TestAccessAuthorizationCodePKCE(t *testing.T) {
 		req.Form.Set("grant_type", string(GrantTypeAuthorizationCode))
 		req.Form.Set("code", "pkce-code")
 		req.Form.Set("state", "a")
+		req.Form.Set("redirect_uri", testAuthURL)
 		req.Form.Set("code_verifier", test.Verifier)
 
 		ar, err := server.GenerateAccessRequest(ctx, req)

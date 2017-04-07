@@ -118,7 +118,7 @@ func (s *NisoIntegrationTestSuite) TestAccessTokenExchangeSuccess() {
 func (s *NisoIntegrationTestSuite) TestAccessTokenExchangeFail() {
 	_, err := s.oauthConfig.Exchange(context.TODO(), "invalid")
 	assert.Error(s.T(), err)
-	assert.Contains(s.T(), err.Error(), "invalid_grant")
+	assert.Contains(s.T(), err.Error(), "invalid_request")
 }
 
 func TestNisoIntegrationTestSuite(t *testing.T) {

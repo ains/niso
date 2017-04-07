@@ -2,7 +2,7 @@ package niso
 
 import (
 	"fmt"
-
+	"net/http"
 	"net/url"
 
 	"github.com/pkg/errors"
@@ -107,7 +107,7 @@ func (e *Error) AsResponse() *Response {
 	}
 
 	// No redirect output error as a JSON response
-	resp.StatusCode = statusCodeForError(e)
+	resp.StatusCode = StatusCodeForError(e)
 	for k, v := range e.GetResponseDict() {
 		if v != "" {
 			resp.Data[k] = v
@@ -166,15 +166,15 @@ func toInternalError(err error) *Error {
 	}
 }
 
-// status code to return for a given error code as per (https://tools.ietf.org/html/rfc6749#section-5.2)
-func statusCodeForError(error *Error) int {
+// StatusCodeForError returns http status code for a given error code as per (https://tools.ietf.org/html/rfc6749#section-5.2)
+func StatusCodeForError(error *Error) int {
 	if error.Code == EServerError {
-		return 500
+		return http.StatusInternalServerError
 	} else if error.Code == ETemporarilyUnavailable {
-		return 503
+		return http.StatusServiceUnavailable
 	} else if error.Code == EInvalidClient || error.Code == EAccessDenied {
-		return 401
+		return http.StatusUnauthorized
 	}
 
-	return 400
+	return http.StatusBadRequest
 }

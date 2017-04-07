@@ -188,6 +188,7 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	ret := &AccessRequest{
 		ClientID:        auth.Username,
 		GrantType:       GrantTypeAuthorizationCode,
+		RedirectURI:     r.FormValue("redirect_uri"),
 		Code:            r.FormValue("code"),
 		CodeVerifier:    r.FormValue("code_verifier"),
 		GenerateRefresh: true,
@@ -208,6 +209,10 @@ func (s *Server) handleAuthorizationCodeRequest(ctx context.Context, r *http.Req
 	// authorization code must be from the client id of current request
 	if authorizeData.ClientID != ret.ClientID {
 		return nil, NewError(EInvalidGrant, "invalid client id for authorization code")
+	}
+
+	if authorizeData.RedirectURI != ret.RedirectURI {
+		return nil, NewError(EInvalidGrant, "invalid redirection uri for authorization code")
 	}
 
 	// authorization code must not be expired
@@ -256,6 +261,7 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 	req := &AccessRequest{
 		ClientID:        auth.Username,
 		GrantType:       GrantTypeRefreshToken,
+		RedirectURI:     r.FormValue("redirect_uri"),
 		RefreshToken:    r.FormValue("refresh_token"),
 		Scope:           r.FormValue("scope"),
 		GenerateRefresh: true,
@@ -278,8 +284,11 @@ func (s *Server) handleRefreshTokenRequest(ctx context.Context, r *http.Request)
 		return nil, NewError(EInvalidClient, "request client id must be the same from previous token")
 	}
 
+	if previousRefreshToken.RedirectURI != req.RedirectURI {
+		return nil, NewError(EInvalidGrant, "request redirect uri must be the same as the one used to issue the refresh token")
+	}
+
 	// set rest of data
-	req.RedirectURI = previousRefreshToken.RedirectURI
 	req.UserData = previousRefreshToken.UserData
 	if req.Scope == "" {
 		req.Scope = previousRefreshToken.Scope

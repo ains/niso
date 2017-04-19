@@ -7,6 +7,8 @@ type ClientData struct {
 	ClientID     string // Unique identifier for this client (https://tools.ietf.org/html/rfc6749#section-2.2)
 	ClientSecret string // OAuth2 client secret (https://tools.ietf.org/html/rfc6749#section-2.3.1)
 	RedirectURI  string // OAuth2 redirect URI
+
+	Labels map[string]string
 }
 
 // ValidSecret checks if the given secret is valid for this OAuth2 client

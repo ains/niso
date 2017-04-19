@@ -13,22 +13,16 @@ type BasicAuth struct {
 
 // getClientAuthFromRequest checks client basic authentication in params if allowed,
 // otherwise gets it from the header.
-// Sets an error on the response if no auth is present or a server error occurs.
+// Sets an error on the response if no auth is present, and query params are not accepted.
 func getClientAuthFromRequest(r *http.Request, allowQueryParams bool) (*BasicAuth, error) {
-	if allowQueryParams {
-		// Allow for auth without password
-		auth := &BasicAuth{
-			Username: r.FormValue("client_id"),
-			Password: r.FormValue("client_secret"),
-		}
-		if auth.Username != "" {
-			return auth, nil
-		}
-	}
-
 	user, pass, ok := r.BasicAuth()
 	if !ok {
-		return nil, errors.New("invalid authorization header")
+		if allowQueryParams {
+			user = r.FormValue("client_id")
+			pass = r.FormValue("client_secret")
+		} else {
+			return nil, errors.New("invalid authorization header")
+		}
 	}
 
 	return &BasicAuth{
